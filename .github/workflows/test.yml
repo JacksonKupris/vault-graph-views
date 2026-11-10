@@ -1,0 +1,18 @@
+# The tests, on every pull request (its checks show on the PR before merging) and every push to main.
+# The runner has Chrome; if it ever doesn't, the page test fails instead of skipping (tests/cdp.cjs reads CI).
+name: Test
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test

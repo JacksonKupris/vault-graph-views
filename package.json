@@ -1,0 +1,22 @@
+{
+  "name": "vault-graph-views",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The graphs for Vault Graph: one renderer and every graph, loaded by the Obsidian plugin or run on a standalone page.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js serve",
+    "bench": "node build.js serve",
+    "test": "node tests/run.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
