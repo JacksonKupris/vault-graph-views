@@ -1,4 +1,4 @@
-// The dev page: what a host does, in the least code. /dev.html?view=bodies|cas9|genome&guide=text
+// The dev page: what a host does, in the least code. /dev.html?view=bodies|cas9|genome|cones&guide=text
 // window.__DATA is the sample graph and window.__FOLD the sample fold (build.js puts both in the page).
 // For the tests: window.__views (the mounted view), __opened, __actions, __error, and __mount(view, inputs, data) to mount again.
 (() => {
