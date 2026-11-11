@@ -113,6 +113,11 @@ try {
   same("and asks the host for the graph", await ev("window.__actions"), ["graph"]);
   same("no journals at all mount too", await page.mount("genome", { fold: { n: 0, X: [], stress: 0, grade: "", domains: [], loops: [] } }, { ...few, strand: { days: [], paths: [], ids: [], rows: [] } }), null);
   same("and say so", await text(".vgv-stat"), "0 days of journals");
+  // journals and a fold, but not one note in the graph (a trimmed vault): no note is drawn, and nothing throws
+  await ev(`window.__errs = []; addEventListener("error", e => window.__errs.push(String(e.message)))`);
+  same("a graph with no notes mounts", await page.mount("genome", undefined, { ...(await ev("window.__DATA")), nodes: [], links: [], clusters: [] }), null);
+  await new Promise(r => setTimeout(r, 400));
+  same("and draws without an error", await ev("window.__errs"), []);
 
   // ---- refusals: the host is told what is wrong
   ok(((await page.mount("genome", {})) || "").includes("inputs.fold should be object"), "no fold is refused, and the message says why");
