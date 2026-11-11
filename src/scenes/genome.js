@@ -98,7 +98,7 @@ export const genome = {
         notes.setMatrixAt(i, m);
         notes.setColorAt(i, col.set(pal[(byId.get(id).cluster || 0) % pal.length]).multiplyScalar(picked && !picked.has(id) ? 0.25 : 1));
       });
-      for (const mesh of [days, notes]) { mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true; }
+      for (const mesh of [days, notes]) { mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
       for (const L of loops) L.tube.material = L.dot.material = !shown || shown === L ? loopOn : loopOff;
       chosen.visible = !!(selected && G.notes.has(selected) && byId.has(selected));
       if (chosen.visible) { chosen.position.set(...G.notes.get(selected)); chosen.scale.setScalar(size(selected) + 0.25); }
