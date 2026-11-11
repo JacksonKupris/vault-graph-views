@@ -15,7 +15,7 @@ import { nearest, project } from "./pick.js";
 export function runScene(el, def, o) {
   const stage = makeStage(el, o.theme, def.stage), frame = makeFrame(el, o.theme);
   let raf = 0, dead = false, over = null;
-  const settle = () => { orbit.apply(); if (scene.frame) scene.frame(); frame.place(stage); };
+  const settle = () => { if (stage.changed()) refit(); orbit.apply(); if (scene.frame) scene.frame(); frame.place(stage); };
   const draw = () => { raf = 0; if (dead) return; settle(); stage.render(); };
   const invalidate = () => { if (!raf && !dead) raf = requestAnimationFrame(draw); };
   const keyAt = (x, y) => { const b = stage.canvas.getBoundingClientRect(); orbit.apply(); return nearest(stage, scene.targets(), x - b.left, y - b.top); };

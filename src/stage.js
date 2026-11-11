@@ -3,7 +3,7 @@
 //   fog    [near, far] in stage units, or false
 //   light  "fixed" (a sun over the scene) or "camera" (over the viewer's left shoulder however the model is turned,
 //          as a model held in the hand is lit)
-import { WebGLRenderer, Scene, PerspectiveCamera, AmbientLight, DirectionalLight, Color, Fog, Box3, Sphere, Vector3 } from "three";
+import { WebGLRenderer, Scene, PerspectiveCamera, AmbientLight, DirectionalLight, Color, Fog, Box3, Matrix4, Vector3 } from "three";
 
 export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0.6 } = {}) {
   const renderer = new WebGLRenderer({ antialias: true });
@@ -24,26 +24,32 @@ export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0
     camera.updateProjectionMatrix();
   }
   resize();
-  // Where the scene really is: its centre and the radius of a sphere round everything drawn, so a layout of any scale
-  // (a few units or a few thousand) is framed the same way. fit(homeDist) is called when the scene is built or changes;
-  // orbit() then looks at the centre and stands back in proportion to the radius.
-  const centre = new Vector3(), ball = new Sphere(), box = new Box3(), part = new Box3(); let fitK = 1;
+  // Where the scene really is: its centre and a radius that holds the bulk of what is drawn, so a layout of any scale (a few
+  // units or a few thousand) is framed the same way. The centre is the middle of each axis's 2nd to 98th percentile range and the radius reaches the 98th
+  // percentile of their distance from it, so a few far outliers (one stray note) do not shrink the rest to a speck.
+  // fit(homeDist) is called when the scene is built or changes; orbit() then looks at the centre and stands back in
+  // proportion to the radius. changed() says whether what the scene holds is not what fit() last measured.
+  const centre = new Vector3(), box = new Box3(), at = new Vector3(), mat = new Matrix4(), corner = new Vector3(); let fitK = 1, seen = "";
+  const holds = () => { let n = 0; scene.traverse(o => { if (o.isMesh || o.isLine || o.isPoints) n += 1 + (o.isInstancedMesh ? o.count : 0) + (o.geometry && o.geometry.attributes.position ? o.geometry.attributes.position.count : 0); }); return n; };
+  const mid = v => { v.sort((p, q) => p - q); const n = v.length; return (v[Math.floor(n * 0.02)] + v[Math.min(n - 1, Math.floor(n * 0.98))]) / 2; };
   function fit(homeDist) {
-    box.makeEmpty();
     scene.updateMatrixWorld(true);   // a scaled or turned parent (the Cas9 model) must be in place before it is measured
+    const pts = [];
     scene.traverse(o => {
       if (!(o.isMesh || o.isLine || o.isPoints)) return;
-      if (o.isInstancedMesh) { o.computeBoundingBox(); part.copy(o.boundingBox).applyMatrix4(o.matrixWorld); box.union(part); }
-      else box.expandByObject(o);
+      if (o.isInstancedMesh) for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, mat); pts.push(at.setFromMatrixPosition(mat).applyMatrix4(o.matrixWorld).clone()); }
+      else { box.makeEmpty().expandByObject(o); if (!box.isEmpty()) for (let k = 0; k < 8; k++) pts.push(corner.set(k & 1 ? box.max.x : box.min.x, k & 2 ? box.max.y : box.min.y, k & 4 ? box.max.z : box.min.z).clone()); }
     });
-    if (box.isEmpty()) { centre.set(0, 0, 0); fitK = 1; return; }
-    box.getBoundingSphere(ball);
-    if (!Number.isFinite(ball.radius) || ball.radius <= 0) { centre.set(0, 0, 0); fitK = 1; return; }
-    centre.copy(ball.center);
-    fitK = Math.max(0.3, Math.min(30, (2.4 * ball.radius) / homeDist));   // 2.4 radii back fits a sphere in a 50 degree view
+    seen = holds();
+    const good = pts.filter(p => Number.isFinite(p.x + p.y + p.z));
+    if (!good.length) { centre.set(0, 0, 0); fitK = 1; return; }
+    centre.set(mid(good.map(p => p.x)), mid(good.map(p => p.y)), mid(good.map(p => p.z)));
+    const d = good.map(p => p.distanceTo(centre)).sort((p, q) => p - q), r = d[Math.min(d.length - 1, Math.floor(d.length * 0.98))] * 1.05;
+    if (!(r > 0)) { fitK = 1; return; }
+    fitK = Math.max(0.3, Math.min(30, (2.4 * r) / homeDist));   // 2.4 radii back fits a sphere in a 50 degree view
   }
   return {
-    renderer, scene, camera, resize, canvas: renderer.domElement, fit, centre,
+    renderer, scene, camera, resize, canvas: renderer.domElement, fit, changed: () => holds() !== seen, centre,
     // on a page taller than it is wide (a phone) the camera stands further back, so a scene fits the width too;
     // the fog stands back with it, or the scene would fade into it
     orbit(yaw, pitch, far) {
