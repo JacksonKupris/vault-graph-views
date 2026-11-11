@@ -22,6 +22,10 @@ const BREAKS = [
   { what: "the still mode is kept among the modes", file: "src/modes.js", from: "if (values[k] < 1e-9) continue;", to: "", test: "test_modes.js" },
   { what: "a click on a note of the sheet doesn't reach the host", file: "src/scenes/modes.js", from: "function open(i) { selected = i; refresh(); shape(); invalidate(); onOpen(V.ids[i]); }", to: "function open(i) { selected = i; refresh(); shape(); invalidate(); }", test: "test_modesview.js" },
   { what: "the sheet keeps ringing under a finger", file: "src/scenes/modes.js", from: "if (playing && !touching) { const now", to: "if (playing) { const now", test: "test_modesview.js" },
+  { what: "a tube never grows or thins toward the flow it carried", file: "src/physarum.js", from: "D[e] = Math.max(floor, D[e] + dt * (Math.abs(Q[e]) - D[e]));", to: "D[e] = Math.max(floor, D[e]);", test: "test_physarum.js" },
+  { what: "flow in a tube ignores how long it is", file: "src/physarum.js", from: "(D[e] / L[e]) * (p[i] - p[j])", to: "D[e] * (p[i] - p[j])", test: "test_physarum.js" },
+  { what: "a click on a note of the slime mould doesn't reach the host", file: "src/scenes/slime.js", from: "refresh(); invalidate(); onOpen(S.ids[i]); }", to: "refresh(); invalidate(); }", test: "test_slimeview.js" },
+  { what: "the mould keeps growing after Hold", file: "src/scenes/slime.js", from: "if (playing && t < T) { const now", to: "if (t < T) { const now", test: "test_slimeview.js" },
 ];
 
 const only = process.argv[2];
