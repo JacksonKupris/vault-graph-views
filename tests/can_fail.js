@@ -18,6 +18,10 @@ const BREAKS = [
   { what: "a match on a person's note counts as a site", file: "src/models/cas9.js", from: "!special(n)", to: "true", test: "test_models.js" },
   { what: "a bar's stiffness ignores its length", file: "src/truss.js", from: "s /= L;", to: "s /= 1;", test: "test_truss.js" },
   { what: "a click on a bar opens a note", file: "src/scenes/loadpaths.js", from: `else if (k.kind === "bar") { bar = +k.id;`, to: `else if (k.kind === "bar") { onOpen(T.ids[0]); bar = +k.id;`, test: "test_loadpaths.js" },
+  { what: "the Laplacian counts a link once instead of in both notes", file: "src/modes.js", from: "L[i][i]++; L[j][j]++;", to: "L[i][i]++;", test: "test_modes.js" },
+  { what: "the still mode is kept among the modes", file: "src/modes.js", from: "if (values[k] < 1e-9) continue;", to: "", test: "test_modes.js" },
+  { what: "a click on a note of the sheet doesn't reach the host", file: "src/scenes/modes.js", from: "function open(i) { selected = i; refresh(); shape(); invalidate(); onOpen(V.ids[i]); }", to: "function open(i) { selected = i; refresh(); shape(); invalidate(); }", test: "test_modesview.js" },
+  { what: "the sheet keeps ringing under a finger", file: "src/scenes/modes.js", from: "if (playing && !touching) { const now", to: "if (playing) { const now", test: "test_modesview.js" },
 ];
 
 const only = process.argv[2];

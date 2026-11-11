@@ -11,7 +11,7 @@ const { ev } = page, V = "window.__views";
 try {
   same("the page is phone sized", await ev("[innerWidth, innerHeight]"), [420, 900]);
   const views = await ev("VaultGraphViews.VIEWS.map(v => v.id)");
-  same("the views", views, ["bodies", "cas9", "genome", "cones", "loadpaths"]);
+  same("the views", views, ["bodies", "cas9", "genome", "cones", "loadpaths", "modes"]);
   const L = await ev("window.__DATA.nodes.filter(n => !n.ghost && !n.person && !n.moc).map(n => n.id).sort()");
   const scan = { guide: "kiosk", where: "in every note", notes: L.filter((_, i) => i % 9 === 4).map(path => ({ path, hits: 1 })) };
   for (const view of views) {
@@ -23,6 +23,7 @@ try {
     same(`${view}: its stat line and buttons are inside the page`, await page.outside(), []);
     const stat = await ev(`(() => { const s = document.querySelector(".vgv-stat"); return s && s.innerText; })()`);
     ok(!!stat && stat === await ev(`${V}.stat()`), `${view}: the stat line is shown (${stat})`);
+    await ev(`(${V}.api.hold || (() => {}))(0.25)`);   // a view that rings is held for the tap (the view itself holds while a finger is down: test_modesview.js)
     await page.shot("phone-" + view);
     // a finger on a note opens it
     await ev("window.__opened = null");
