@@ -55,7 +55,7 @@ The plugin owns the data shape. `fixtures/sample-graph.json` is a copy of the pl
 | `src/run.js` | Runs a scene: mounts it on the stage, wires turning, picking, the frame and the host's handle. Every view goes through it. |
 | `src/stage.js` | The one stage every scene draws on: renderer, camera, lights, fog, sizing, teardown. A scene never makes its own renderer. |
 | `src/orbit.js`, `src/pick.js` | Turning and zooming by mouse or finger; what is under a point. |
-| `src/frame.js`, `src/text.js`, `src/notes.js` | The stat line, controls, labels and tooltip over the canvas; wording helpers; which notes are the vault's own writing. |
+| `src/frame.js`, `src/insights.js`, `src/text.js`, `src/notes.js` | The stat line, legend, Insights card, controls, labels and tooltip over the canvas; what each maths view says about the notes; wording helpers; which notes are the vault's own writing. |
 | `src/scenes/` | One file a view: `bodies.js`, `cas9.js`, `genome.js`, `cones.js`, `loadpaths.js` (its maths is `src/truss.js`), `slime.js` (its maths is `src/physarum.js`), `modes.js` (its maths is `src/modes.js`; `src/network.js` is the link network both share). |
 | `src/models/` | `cas9.js` (the Cas9 model's numbers and where each note sits) and `cas9-model.js` (the packed atoms, written by `scripts/cas9_model.cjs`). |
 | `src/bench.js`, `bench/bench.js` | The phone benchmark and its page. |

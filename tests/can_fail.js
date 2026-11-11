@@ -26,6 +26,8 @@ const BREAKS = [
   { what: "flow in a tube ignores how long it is", file: "src/physarum.js", from: "(D[e] / L[e]) * (p[i] - p[j])", to: "D[e] * (p[i] - p[j])", test: "test_physarum.js" },
   { what: "a click on a note of the slime mould doesn't reach the host", file: "src/scenes/slime.js", from: "refresh(); invalidate(); onOpen(S.ids[i]); }", to: "refresh(); invalidate(); }", test: "test_slimeview.js" },
   { what: "the mould keeps growing after Hold", file: "src/scenes/slime.js", from: "if (playing && t < T) { const now", to: "if (t < T) { const now", test: "test_slimeview.js" },
+  { what: "the Insights button is not added to the controls", file: "src/frame.js", from: 'const buttons = info && at === "bottom" ?', to: 'const buttons = false && at === "bottom" ?', test: "test_explain.js" },
+  { what: "a link count in an insight is wrong", file: "src/insights.js", from: 'It is held by ${plural(deg[sagging], "link")}', to: 'It is held by ${plural(deg[sagging] + 1, "link")}', test: "test_insights.js" },
 ];
 
 const only = process.argv[2];

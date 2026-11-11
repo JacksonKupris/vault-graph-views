@@ -10,7 +10,7 @@ const page = await openDev();
 if (!page) skip(NAME);
 const { ev } = page, V = "window.__views", A = `${V}.api`;
 const text = sel => ev(`(document.querySelector(${JSON.stringify(sel)}) || {}).innerText || ""`);
-const labels = () => ev(`[...document.querySelectorAll(".vgv-frame > div:nth-child(3) > *")].filter(n => n.style.display !== "none").map(n => n.textContent)`);
+const labels = () => ev(`[...document.querySelectorAll(".vgv-labels > *")].filter(n => n.style.display !== "none").map(n => n.textContent)`);
 
 try {
   same("Genome fold mounts with the sample fold", await page.mount("genome"), null);

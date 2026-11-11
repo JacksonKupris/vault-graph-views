@@ -4,6 +4,7 @@
 //   inputs.selected the host's selected note · onOpen(id) a note · onAction("graph")
 // The maths is physarum.js; this only draws it.
 import { InstancedMesh, SphereGeometry, CylinderGeometry, MeshStandardMaterial, Matrix4, Color, Vector3, Quaternion } from "three";
+import { slimeInsights } from "../insights.js";
 import { plural, clip } from "../text.js";
 import { vaultSlime } from "../physarum.js";
 
@@ -11,7 +12,7 @@ export const FRAMES_PER_SECOND = 8, CARRY = 0.1;
 
 export const slime = {
   id: "slime", name: "Slime mould", hint: "Which written links carry the vault, and which fade away",
-  home: { yaw: 0.6, pitch: 0.7, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100] },
+  home: { yaw: 0.6, pitch: 1.0, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100] },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const S = vaultSlime(data.nodes, data.links, { max: 80 }), n = S.ids.length, T = S.frames.length - 1;
@@ -73,6 +74,9 @@ export const slime = {
     }
     function open(i) { selected = i; refresh(); invalidate(); onOpen(S.ids[i]); }
     const targets = () => S.ids.map((id, i) => { const [x, z] = place(i); return { at: [x, 0, z], r: size(i) * 1.3, key: { kind: "note", id, tip: `${name(i)}${hub.has(i) ? " · hub" : ""}` } }; });
+    const I = slimeInsights({ n, bars: S.bars, kept: S.kept, hubs: S.hubs, order: S.ids.map((_, i) => i) }, name);
+    frame.explain({ plain: I.plain, about: I.about, legend: [{ color: "#f59e0b", text: "carries flow" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }],
+      insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; t = T; playing = false; refresh(); invalidate(); } } })) });
     refresh();
     return {
       targets,
