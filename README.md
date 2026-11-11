@@ -133,7 +133,9 @@ The plugin takes this library as a dependency pinned to a tag, so a plugin relea
 "dependencies": { "vault-graph-views": "github:JacksonKupris/vault-graph-views#v0.2.0" }
 ```
 
-`npm install` in the plugin fetches that tag and builds it. npm 11 and newer refuse git dependencies unless allowed, so the plugin's `.npmrc` holds `allow-git=root`, which allows only the dependencies the plugin lists itself. Without that line the install stops with `EALLOWGIT`; remote tarballs are refused too (`EALLOWREMOTE`), so they are no way round it. The plugin then has the bundle (`vault-graph-views/bundle`), the contract (`vault-graph-views/contract`) and the sample data (`vault-graph-views/fixtures/sample-graph.json`).
+The built bundle `dist/vault-graph-views.js` is committed, because an install from a git tag does not run `prepare` under every npm version (the plugin's CI on npm 10 got no bundle). Whoever changes `src/` runs `npm run build` and commits the bundle with it; `tests/test_bundle_committed.js` fails when the committed file differs from a fresh build. `dev.html` and `bench.html` stay uncommitted.
+
+`npm install` in the plugin fetches that tag. npm 11 and newer refuse git dependencies unless allowed, so the plugin's `.npmrc` holds `allow-git=root`, which allows only the dependencies the plugin lists itself. Without that line the install stops with `EALLOWGIT`; remote tarballs are refused too (`EALLOWREMOTE`), so they are no way round it. The plugin then has the bundle (`vault-graph-views/bundle`), the contract (`vault-graph-views/contract`) and the sample data (`vault-graph-views/fixtures/sample-graph.json`).
 
 To release:
 1. In a pull request, raise `version` in `package.json` and run `npm install` so `package-lock.json` follows. Merge it.
