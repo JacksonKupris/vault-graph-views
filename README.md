@@ -15,6 +15,7 @@ Two hosts load the same build:
 | `genome` | Genome fold | The journals as one folded strand: a bead a day, the notes each day names among them, loops between days that name the same notes. | `fold` | `graph`: open the graph |
 | `cones` | Light cones | Time is the vertical axis. Pick a note: what it rested on lights up below it, what it could have touched above it. | (the selection) | `graph`: open the graph |
 | `loadpaths` | Load paths | The vault as a truss: notes are joints, written links are bars, open tasks are weight, the most important notes are ground. Thick bars carry the most; blue is pulled, red is pushed. | (the selection) | `graph`: open the graph |
+| `modes` | Normal modes | The vault as a drum skin: notes are masses on a sheet, written links are springs, and the sheet rings in the shapes the links allow. Amber swings up, blue down, the dark line between is still. Mode 1 is the cleanest cut into two halves; the arrows step through faster modes. | none | `graph` (when too few notes are joined) |
 
 `VaultGraphViews.VIEWS` lists them (`id`, `name`, `hint`, `actions`).
 
@@ -54,7 +55,7 @@ The plugin owns the data shape. `fixtures/sample-graph.json` is a copy of the pl
 | `src/stage.js` | The one stage every scene draws on: renderer, camera, lights, fog, sizing, teardown. A scene never makes its own renderer. |
 | `src/orbit.js`, `src/pick.js` | Turning and zooming by mouse or finger; what is under a point. |
 | `src/frame.js`, `src/text.js`, `src/notes.js` | The stat line, controls, labels and tooltip over the canvas; wording helpers; which notes are the vault's own writing. |
-| `src/scenes/` | One file a view: `bodies.js`, `cas9.js`, `genome.js`, `cones.js`, `loadpaths.js` (its maths is `src/truss.js`). |
+| `src/scenes/` | One file a view: `bodies.js`, `cas9.js`, `genome.js`, `cones.js`, `loadpaths.js` (its maths is `src/truss.js`), `modes.js` (its maths is `src/modes.js`; `src/network.js` is the link network both share). |
 | `src/models/` | `cas9.js` (the Cas9 model's numbers and where each note sits) and `cas9-model.js` (the packed atoms, written by `scripts/cas9_model.cjs`). |
 | `src/bench.js`, `bench/bench.js` | The phone benchmark and its page. |
 | `dev/dev.js` | The dev page's host code. |

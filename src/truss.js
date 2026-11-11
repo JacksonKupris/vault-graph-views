@@ -1,7 +1,7 @@
 // The direct stiffness method for a pin-jointed space truss, and the vault turned into one. Pure (no screen), so tests check it.
 // A note is a joint, a written link is a bar of the same stiffness, an open task is a weight on its note, and the vault's most
 // important notes are the ground. The solve says which links carry the weight (axial force) and which note sags most.
-import { special, importanceOf, hash } from "./notes.js";
+import { joinedNotes, springLayout } from "./network.js";
 
 // Bars [i, j] between joints at pos[i], pos[j] (EA = 1 for every bar), joints in `fixed` held in place, loads[i] = [fx, fy, fz].
 // Returns u (displacement of each joint), force (per bar; positive pulls the joints together = tension, negative pushes = compression),
@@ -46,26 +46,7 @@ export function solveTruss({ pos, bars, fixed, loads }, { iterations = 2000, tol
 // by a short spring layout of the links.
 //   returns { ids, pos, bars (pairs of indexes), fixed (indexes), loads, weight (per joint), ground (ids) }
 export function vaultTruss(nodes, links, { max = 120, ground = 0.1 } = {}) {
-  const imp = importanceOf(nodes), own = new Map(nodes.filter(n => !special(n)).map(n => [n.id, n]));
-  const adj = new Map([...own.keys()].map(id => [id, new Set()]));
-  for (const l of links) if (l.kind === "link" && l.source !== l.target && adj.has(l.source) && adj.has(l.target)) { adj.get(l.source).add(l.target); adj.get(l.target).add(l.source); }
-  const seen = new Set(); let best = [];
-  for (const id of [...adj.keys()].sort()) {
-    if (seen.has(id) || !adj.get(id).size) continue;
-    const comp = [id]; seen.add(id);
-    for (let i = 0; i < comp.length; i++) for (const nb of adj.get(comp[i])) if (!seen.has(nb)) { seen.add(nb); comp.push(nb); }
-    if (comp.length > best.length) best = comp;
-  }
-  const ids = best.sort((a, b) => imp(own.get(b)) - imp(own.get(a)) || (a < b ? -1 : 1)).slice(0, max), at = new Map(ids.map((id, i) => [id, i]));
-  const bars = [];
-  for (const id of ids) for (const nb of adj.get(id)) if (at.has(nb) && at.get(id) < at.get(nb)) bars.push([at.get(id), at.get(nb)]);
-  const n = ids.length, R = 14, P = ids.map((id, i) => { const a = (hash(id) % 6283) / 1000, r = R * Math.sqrt((i + 1) / n); return [Math.cos(a) * r, Math.sin(a) * r]; });
-  for (let step = 0; step < 80; step++) {
-    const F = P.map(() => [0, 0]), cool = 0.5 * (1 - step / 80);
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { const dx = P[i][0] - P[j][0], dy = P[i][1] - P[j][1], f = 6 / (dx * dx + dy * dy + 0.01); F[i][0] += dx * f; F[i][1] += dy * f; F[j][0] -= dx * f; F[j][1] -= dy * f; }
-    for (const [i, j] of bars) { const dx = P[j][0] - P[i][0], dy = P[j][1] - P[i][1], d = Math.hypot(dx, dy) || 1e-6, f = (d - 3) * 0.08; F[i][0] += dx * f; F[i][1] += dy * f; F[j][0] -= dx * f; F[j][1] -= dy * f; }
-    for (let i = 0; i < n; i++) { const m = Math.hypot(...F[i]) || 1, s = Math.min(m, cool * 4) / m; P[i][0] += F[i][0] * s; P[i][1] += F[i][1] * s; }
-  }
+  const { ids, bars, own, imp } = joinedNotes(nodes, links, { max }), n = ids.length, P = springLayout(ids, bars);
   const top = Math.max(1e-9, ...ids.map(id => imp(own.get(id)))), H = 10;
   const pos = ids.map((id, i) => [P[i][0], (0.5 - imp(own.get(id)) / top) * 2 * H, P[i][1]]);
   const groundN = Math.min(n, Math.max(3, Math.round(n * ground))), fixed = [...Array(groundN).keys()];
