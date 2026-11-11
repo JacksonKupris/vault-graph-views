@@ -1,14 +1,30 @@
 {
   "name": "vault-graph-views",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "The graphs for Vault Graph: one renderer and every graph, loaded by the Obsidian plugin or run on a standalone page.",
   "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./contract": "./src/contract.js",
+    "./bundle": "./dist/vault-graph-views.js",
+    "./fixtures/*": "./fixtures/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "fixtures",
+    "dist/vault-graph-views.js"
+  ],
   "scripts": {
     "build": "node build.js",
+    "prepare": "node build.js",
     "dev": "node build.js serve",
     "bench": "node build.js serve",
-    "test": "node tests/run.js"
+    "test": "node tests/run.js",
+    "can-fail": "node tests/can_fail.js",
+    "release": "node scripts/release.js"
   },
   "engines": {
     "node": ">=22"
