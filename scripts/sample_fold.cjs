@@ -9,11 +9,10 @@ const stop = msg => { console.error("sample_fold: " + msg); process.exit(1); };
 const science = path.join(plugin, "src", "science.js");
 if (!fs.existsSync(science)) stop(`no src/science.js in ${plugin}. Clone https://github.com/JacksonKupris/obsidian-graph and pass its folder.`);
 const S = new Function(`${fs.readFileSync(science, "utf8")}; return VGScience;`)();
-if (typeof S.genomeFold !== "function" || typeof S.stressGrade !== "function") stop("the plugin's science.js has no genomeFold or stressGrade: the fold moved, bring this script along");
+if (typeof S.genomeFold !== "function" || typeof S.foldForViews !== "function") stop("the plugin's science.js has no genomeFold or foldForViews: the fold moved, bring this script along");
 const data = JSON.parse(fs.readFileSync(path.join(ROOT, "fixtures", "sample-graph.json"), "utf8"));
 if (!data.strand || !Array.isArray(data.strand.rows)) stop("fixtures/sample-graph.json has no strand.rows");
-const f = S.genomeFold(data.strand.rows), r4 = v => +v.toFixed(4);
-// exactly what a host passes as inputs.fold (src/contract.js, FOLD_SHAPE)
-const fold = { n: f.n, X: f.X.map(p => [0, 1, 2].map(i => r4(p[i] || 0))), stress: r4(f.stress), grade: S.stressGrade(f.stress), domains: f.domains, loops: f.loops.map(l => ({ a: l.a, b: l.b, count: l.count })) };
+// the plugin's one converter (VGScience.foldForViews) makes exactly what a host passes as inputs.fold (src/contract.js, FOLD_SHAPE)
+const fold = S.foldForViews(S.genomeFold(data.strand.rows));
 fs.writeFileSync(path.join(ROOT, "fixtures", "sample-fold.json"), JSON.stringify(fold) + "\n");
 console.log(`wrote fixtures/sample-fold.json: ${fold.n} days, ${fold.domains.length} domains, ${fold.loops.length} loops, stress ${fold.stress} (${fold.grade})`);
