@@ -13,7 +13,7 @@ export function loadInsights({ n, bars, ground, sag, sagging, weakest, busiest, 
   if (busiest >= 0) out.push({ text: `${name(bars[busiest][0])} – ${name(bars[busiest][1])} carries the most (${carry[busiest].toFixed(1)}). Everything leaning on it is one edit from sagging.`, label: "Show link", bar: busiest });
   const thin = deg.map((d, i) => [d, i]).filter(([d, i]) => d === 1 && !ground.includes(i)).length;
   if (thin) out.push({ text: `${plural(thin, "note")} hang from a single link. Each is a note to link from a second place.`, label: "Show worst", note: sagging });
-  return { about: "Each written link is a steel bar and each note a joint; the most linked notes are the ground. Load is the notes' weight. A note sags when few links hold it, and a link carries more when more notes lean on it.", insights: out };
+  return { plain: "Picture your notes as a bridge. Links are the beams and notes are the joints. A note held up by only one beam droops, and a beam doing all the carrying is the one that snaps first.", about: "Each written link is a steel bar and each note a joint; the most linked notes are the ground. Load is the notes' weight. A note sags when few links hold it, and a link carries more when more notes lean on it.", insights: out };
 }
 
 // Normal modes: the sheet rings in the shapes the links allow; a mode is a cut of the vault, and few links crossing it means a clean cut.
@@ -25,7 +25,7 @@ export function modeInsights({ bars, vector, freq, k, count }, name) {
   if (hi !== lo) out.push({ text: `${name(hi)} and ${name(lo)} swing furthest apart. A link between them, or through a shared note, ties the halves together.`, label: "Open " + name(hi).slice(0, 18), note: hi });
   const rest = vector.filter((_, i) => side(i) === 0).length;
   if (rest) out.push({ text: `${plural(rest, "note")} sit on the nodal line, belonging to neither half. They are the bridges; keep their links.`, label: "Show it", show: true });
-  return { about: "Notes are masses on a stretched sheet and links are springs. The sheet rings in the shapes the links allow; amber swings up while blue swings down, and the dark line between them does not move. A lower frequency means a cleaner cut.", insights: out, freq, count };
+  return { plain: "Picture your notes as a drum skin. Tap it and it wobbles in a pattern. The two halves that move against each other are the two clumps of your notes that hardly talk to each other.", about: "Notes are masses on a stretched sheet and links are springs. The sheet rings in the shapes the links allow; amber swings up while blue swings down, and the dark line between them does not move. A lower frequency means a cleaner cut.", insights: out, freq, count };
 }
 
 // Slime mould: tubes are links; the ones that carry flow between the hubs thicken, the rest fade. Notes off the backbone are only reached by detour.
@@ -35,5 +35,5 @@ export function slimeInsights({ n, bars, kept, hubs, order }, name) {
   out.push({ text: `${carrying} of ${plural(bars.length, "link")} carry the vault between its ${hubs.length} hubs. The rest are never the short way from one hub to another.`, label: "Show it", show: true });
   if (off.length) out.push({ text: `${plural(off.length, "note")} are off the backbone. ${name(off[0])} has ${plural(deg[off[0]], "link")} but none that leads to a hub; link it to one.`, label: "Open note", note: off[0] });
   out.push({ text: `Links off the backbone are not wrong, but they add detours. Where two notes say the same thing, keep the one on the backbone.`, label: "Show it", show: true });
-  return { about: "A slime mould thickens the tubes that carry the most flow and lets the rest die. Here each written link is a tube and the hubs are the food: what survives is the shortest set of links that holds the vault together.", insights: out };
+  return { plain: "Picture your notes as a slime mould finding food. It keeps the tubes that get used and lets the rest dry up. The links that stay thick are the ones your notes really rely on.", about: "A slime mould thickens the tubes that carry the most flow and lets the rest die. Here each written link is a tube and the hubs are the food: what survives is the shortest set of links that holds the vault together.", insights: out };
 }

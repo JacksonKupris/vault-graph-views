@@ -13,5 +13,6 @@ ok(M.insights.some(i => i.note === 0) && M.insights.some(i => /nodal line/.test(
 const S = slimeInsights({ n: 4, bars: [[0, 1], [1, 2], [2, 3]], kept: [true, true, false], hubs: [0, 1], order: [0, 1, 2, 3] }, name);
 ok(/2 of 3 links carry the vault between its 2 hubs/.test(S.insights[0].text), S.insights[0].text);
 ok(S.insights.some(i => i.note === 3 && /off the backbone/.test(i.text)), "a note off the backbone is named with an action");
+ok([L, M, S].every(v => /^Picture your notes as/.test(v.plain)), "each view has a plain-words picture first");
 ok([L, M, S].every(v => v.about.length > 60), "each view says how the notes relate to its formula");
 done();

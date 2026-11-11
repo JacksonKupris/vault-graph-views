@@ -18,6 +18,7 @@ try {
     ok(await page.press("How the notes relate to this view and how to improve them"), `${view}: the Insights button is there to press`);
     await page.shot("explain-" + view);
     const card = await ev(`(document.querySelector(".vgv-insights") || {}).innerText || ""`);
+    ok(/^Picture your notes as/.test(card), `${view}: the card starts with a plain-words picture`);
     ok(card.length > 150, `${view}: the card says how the notes relate to the formula (${card.length} characters)`);
     const cr = await rect(".vgv-insights"), bar = await rect(".vgv-controls");
     ok(cr && cr.l >= 0 && cr.r <= W && cr.t >= 0, `${view}: the card fits the pane`);

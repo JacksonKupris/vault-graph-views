@@ -84,7 +84,7 @@ export const modes = {
     }
     function explain() {
       const I = modeInsights({ bars: V.bars, vector: mode().vector, freq: mode().freq, k, count: V.modes.length }, name);
-      frame.explain({ about: I.about, legend: [{ color: UP, text: "swings up" }, { color: DOWN, text: "swings down" }, { color: theme.muted, text: "nodal line, still" }],
+      frame.explain({ plain: I.plain, about: I.about, legend: [{ color: UP, text: "swings up" }, { color: DOWN, text: "swings down" }, { color: theme.muted, text: "nodal line, still" }],
         insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; setMode(k); } } })) });
     }
     function refresh() { labels(); frame.stat(stat()); }

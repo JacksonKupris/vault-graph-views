@@ -4,7 +4,7 @@
 //   stat(text)                          one line, top left
 //   controls({ at, lines, buttons })    the next step. at "bottom" (default) or "centre" (an empty state);
 //                                       lines [text...] first is the main one; buttons [{ label, title, run, off }]
-//   explain({ legend, about, insights })  what the colours mean (legend [{color, text}], always shown under the stat line) and a card behind
+//   explain({ legend, plain, about, insights })  what the colours mean (legend [{color, text}], always shown under the stat line) and a card behind
 //                                       an Insights button: about (how the notes relate to the formula), insights [{ text, label, run }]
 //   chip(text, clear)                   a filter in force, with its way out; chip(null) takes it away
 //   labels([{ text, at, color, dy, run, title, strong }])   names pinned to points of the scene, first wins a clash
@@ -49,6 +49,7 @@ export function makeFrame(el, t) {
   const drawCard = () => {
     cardEl.style.display = info && cardOpen ? "flex" : "none"; cardEl.replaceChildren();
     if (!info || !cardOpen) return;
+    if (info.plain) { const p = make("div", { color: t.fg, lineHeight: "1.35", fontWeight: "600" }, cardEl); p.textContent = info.plain; }
     if (info.about) make("div", { color: t.fg, lineHeight: "1.35" }, cardEl).textContent = info.about;
     for (const it of info.insights || []) {
       const row = make("div", { display: "flex", gap: "8px", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }, cardEl);

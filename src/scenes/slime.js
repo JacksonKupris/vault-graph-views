@@ -75,7 +75,7 @@ export const slime = {
     function open(i) { selected = i; refresh(); invalidate(); onOpen(S.ids[i]); }
     const targets = () => S.ids.map((id, i) => { const [x, z] = place(i); return { at: [x, 0, z], r: size(i) * 1.3, key: { kind: "note", id, tip: `${name(i)}${hub.has(i) ? " · hub" : ""}` } }; });
     const I = slimeInsights({ n, bars: S.bars, kept: S.kept, hubs: S.hubs, order: S.ids.map((_, i) => i) }, name);
-    frame.explain({ about: I.about, legend: [{ color: "#f59e0b", text: "carries flow" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }],
+    frame.explain({ plain: I.plain, about: I.about, legend: [{ color: "#f59e0b", text: "carries flow" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }],
       insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; t = T; playing = false; refresh(); invalidate(); } } })) });
     refresh();
     return {

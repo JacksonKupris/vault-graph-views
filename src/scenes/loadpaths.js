@@ -76,7 +76,7 @@ export const loadpaths = {
       ...T.bars.map((p, b) => ({ at: mid(b), r: Math.max(thick(b) * 2, 0.35), key: { kind: "bar", id: String(b), tip: `${name(p[0])} – ${name(p[1])} · ${kind(b)} with ${amount(b)}` } }))];
     const explain = () => {
       const I = loadInsights({ n, bars: T.bars, ground: T.ground, sag: R.sag, sagging: R.sagging, weakest: R.weakest, busiest: R.busiest, carry: R.carry }, name);
-      frame.explain({ about: I.about, legend: [{ color: TENSION, text: "pulled" }, { color: COMPRESSION, text: "pushed" }, { color: GROUND, text: "ground" }, { color: theme.muted, text: "thicker bar = more load" }],
+      frame.explain({ plain: I.plain, about: I.about, legend: [{ color: TENSION, text: "pulled" }, { color: COMPRESSION, text: "pushed" }, { color: GROUND, text: "ground" }, { color: theme.muted, text: "thicker bar = more load" }],
         insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.bar != null) { bar = it.bar; selected = null; paint(); invalidate(); } else open(it.note); } })) });
     };
     explain(); paint();
