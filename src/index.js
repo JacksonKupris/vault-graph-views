@@ -12,8 +12,9 @@ import { bodies } from "./scenes/bodies.js";
 import { cas9 } from "./scenes/cas9.js";
 import { genome } from "./scenes/genome.js";
 import { cones } from "./scenes/cones.js";
+import { loadpaths } from "./scenes/loadpaths.js";
 
-const SCENES = { bodies, cas9, genome, cones };
+const SCENES = { bodies, cas9, genome, cones, loadpaths };
 export const VIEWS = Object.values(SCENES).map(s => ({ id: s.id, name: s.name, hint: s.hint, actions: s.actions || [] }));
 
 export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction, theme } = {}) {
