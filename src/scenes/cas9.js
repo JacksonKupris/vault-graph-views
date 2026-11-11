@@ -32,7 +32,7 @@ export function cas9Body(A, geometry, material) {
 export const cas9 = {
   id: "cas9", name: "Cas9", hint: "Notes as DNA, the Guide scan's matches as cut sites",
   // opens on the side where the guide RNA and both DNA arms show (checked by eye on the dev page)
-  home: { yaw: 0, pitch: 0.2, dist: 44, min: 14, max: 240 }, stage: { light: "camera", fog: [70, 260], ambient: 0.5 },
+  home: { yaw: 0, pitch: 0.2, dist: 44, min: 14, max: 240, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 260], ambient: 0.5 },
   actions: ["guide-scan"],
   build({ stage, frame, data, inputs, onOpen, onAction, invalidate }) {
     const A = cas9Parts(), byId = new Map(data.nodes.map(n => [n.id, n])), name = id => (byId.get(id) ? byId.get(id).name : id);
