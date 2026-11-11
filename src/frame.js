@@ -1,0 +1,84 @@
+// The frame round every scene: what a scene declares in words (its stat line, its labels, its buttons, a filter in
+// force, a tooltip) is drawn here, once, as page elements over the canvas. A scene never makes its own buttons, so a
+// control looks and behaves the same in every view.
+//   stat(text)                          one line, top left
+//   controls({ at, lines, buttons })    the next step. at "bottom" (default) or "centre" (an empty state);
+//                                       lines [text...] first is the main one; buttons [{ label, title, run, off }]
+//   chip(text, clear)                   a filter in force, with its way out; chip(null) takes it away
+//   labels([{ text, at, color, dy, run, title, strong }])   names pinned to points of the scene, first wins a clash
+//   tip(text, x, y)                     at a point of the canvas; tip(null) hides it
+//   place(stage)                        every frame: moves the labels to where their points are now
+import { project } from "./pick.js";
+
+const css = (el, style) => { Object.assign(el.style, style); return el; };
+
+export function makeFrame(el, t) {
+  if (getComputedStyle(el).position === "static") el.style.position = "relative";
+  const halo = `0 0 3px ${t.bg}, 0 0 3px ${t.bg}, 0 1px 2px ${t.bg}`;
+  const make = (tag, style, parent) => { const n = document.createElement(tag); css(n, style); (parent || root).appendChild(n); return n; };
+  const root = css(document.createElement("div"), { position: "absolute", inset: "0", pointerEvents: "none", overflow: "hidden", font: "13px system-ui, sans-serif", color: t.fg, userSelect: "none" });
+  root.className = "vgv-frame";
+  el.appendChild(root);
+  const statEl = make("div", { position: "absolute", left: "12px", top: "10px", right: "12px", color: t.muted, textShadow: halo });
+  statEl.className = "vgv-stat";
+  const chipEl = make("div", { position: "absolute", top: "34px", left: "0", right: "0", display: "none", justifyContent: "center" });
+  const labelsEl = make("div", { position: "absolute", inset: "0" });
+  const controlsEl = make("div", { position: "absolute", left: "0", right: "0", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "0 12px" });
+  controlsEl.className = "vgv-controls";
+  const tipEl = make("div", { position: "absolute", display: "none", maxWidth: "260px", padding: "4px 8px", borderRadius: "6px", background: t.bg, border: `1px solid ${t.muted}`, color: t.fg, fontSize: "12px" });
+  tipEl.className = "vgv-tip";
+
+  // every style a host's own button rules could change is set here, so a theme can't restyle or resize it
+  function button(parent, { label, title, run, off }, style) {
+    const b = make("button", Object.assign({ pointerEvents: off ? "none" : "auto", cursor: "pointer", minHeight: "36px", height: "auto", minWidth: "36px", width: "auto", padding: "6px 14px", margin: "0",
+      borderRadius: "8px", border: `1px solid ${t.muted}`, background: t.bg, color: t.fg, font: "600 13px system-ui, sans-serif", boxShadow: "none", opacity: off ? "0.35" : "1", lineHeight: "1.2" }, style || {}), parent);
+    b.type = "button"; b.textContent = label; b.disabled = !!off;
+    if (title) { b.title = title; b.setAttribute("aria-label", title); }
+    b.addEventListener("click", e => { e.stopPropagation(); run(); });
+    return b;
+  }
+  let pinned = [];
+  return {
+    stat(text) { statEl.textContent = text || ""; },
+    controls({ at = "bottom", lines = [], buttons = [] } = {}) {
+      controlsEl.replaceChildren();
+      css(controlsEl, at === "centre" ? { top: "50%", bottom: "auto", transform: "translateY(-50%)" } : { top: "auto", bottom: "18px", transform: "none" });
+      lines.forEach((text, i) => { make("div", { textAlign: "center", textShadow: halo, color: i || at !== "centre" ? t.muted : t.fg, fontWeight: i || at !== "centre" ? "400" : "600", fontSize: i || at !== "centre" ? "13px" : "14px" }, controlsEl).textContent = text; });
+      if (buttons.length) { const row = make("div", { display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", maxWidth: "100%" }, controlsEl); buttons.forEach(b => button(row, b, b.wide ? { maxWidth: "70vw", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : null)); }
+    },
+    chip(text, clear) {
+      chipEl.replaceChildren();
+      chipEl.style.display = text ? "flex" : "none";
+      if (text) button(chipEl, { label: `${text}  ✕`, title: `${text}. Clear`, run: clear }, { borderRadius: "18px", fontWeight: "400" });
+    },
+    labels(list) {
+      labelsEl.replaceChildren();
+      pinned = list.map(l => {
+        const style = { position: "absolute", left: "0", top: "0", whiteSpace: "nowrap", color: l.color || t.fg, textShadow: halo, font: `${l.strong ? "700 15px" : "11px"} system-ui, sans-serif`, willChange: "transform" };
+        const n = l.run ? button(labelsEl, { label: l.text, title: l.title, run: l.run }, Object.assign(style, { minHeight: "0", minWidth: "0", padding: "3px 4px", border: "none", background: "transparent" })) : make("div", style, labelsEl);
+        if (!l.run) n.textContent = l.text;
+        return { l, n, w: n.offsetWidth, h: n.offsetHeight };
+      });
+    },
+    tip(text, x, y) {
+      tipEl.style.display = text ? "block" : "none";
+      if (text) { tipEl.textContent = text; css(tipEl, { left: Math.max(4, Math.min(root.clientWidth - 264, x + 14)) + "px", top: Math.max(4, y + 16) + "px" }); }
+    },
+    place(stage) {
+      const W = root.clientWidth, H = root.clientHeight, taken = [];
+      for (const { l, n, w, h } of pinned) {
+        const p = project(stage, l.at);
+        let show = !!p && p.x > -w && p.x < W + w && p.y > -h && p.y < H + h, x = 0, y = 0;
+        if (show) {
+          // centred on its point (or to its right, side: "right"), kept on the page and clear of the stat line and the buttons
+          x = Math.max(6, Math.min(W - w - 6, l.side === "right" ? p.x + (l.dx || 0) : p.x - w / 2));
+          y = Math.max(34, Math.min(H - 110, p.y + (l.dy || 0) - h / 2));
+          show = !taken.some(r => x < r[0] + r[2] && x + w > r[0] && y < r[1] + r[3] && y + h > r[1]);
+        }
+        n.style.display = show ? "" : "none";
+        if (show) { n.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`; taken.push([x, y, w, h]); }
+      }
+    },
+    dispose() { root.remove(); },
+  };
+}

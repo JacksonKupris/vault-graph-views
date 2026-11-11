@@ -21,7 +21,7 @@ function page(title, bundle, script, data) {
 <style>html,body{margin:0;height:100%;overflow:hidden;background:#14161a;color:#ddd;font:14px system-ui}#host{position:absolute;inset:0}</style>
 <div id="host"></div>
 <script>${inScript(bundle)}</script>
-${data ? `<script>window.__DATA = ${inScript(data)};</script>\n` : ""}<script>${inScript(script)}</script></html>`;
+${data ? `<script>window.__DATA = ${inScript(data.graph)}; window.__FOLD = ${inScript(data.fold)};</script>\n` : ""}<script>${inScript(script)}</script></html>`;
 }
 
 export async function build() {
@@ -33,7 +33,8 @@ export async function build() {
     format: "iife", globalName: GLOBAL, target: "es2022", legalComments: "none", logLevel: "warning",
   });
   const bundle = fs.readFileSync(path.join(DIST, BUNDLE), "utf8");
-  const data = JSON.stringify(JSON.parse(read("fixtures/sample-graph.json")));
+  // the sample graph is the plugin's fixture; the sample fold is the plugin's fold of it (scripts/sample_fold.cjs)
+  const data = { graph: JSON.stringify(JSON.parse(read("fixtures/sample-graph.json"))), fold: JSON.stringify(JSON.parse(read("fixtures/sample-fold.json"))) };
   fs.writeFileSync(path.join(DIST, "dev.html"), page("Vault Graph Views", bundle, read("dev/dev.js"), data));
   fs.writeFileSync(path.join(DIST, "bench.html"), page("Vault Graph Views bench", bundle, read("bench/bench.js")));
   return { bytes: Buffer.byteLength(bundle), dev: path.join(DIST, "dev.html"), bench: path.join(DIST, "bench.html") };
