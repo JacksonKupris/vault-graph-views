@@ -32,7 +32,8 @@ export function runScene(el, def, o) {
     },
   });
   const scene = def.build({ stage, frame, orbit, invalidate, ...o });
-  invalidate();
+  const refit = () => stage.fit((def.home && def.home.dist) || 48);   // the camera is framed to what the scene really drew
+  refit(); invalidate();
   return {
     view: def.id,
     resize() { stage.resize(); invalidate(); },
@@ -42,7 +43,7 @@ export function runScene(el, def, o) {
     noteAt(x, y) { const k = keyAt(x, y); return k && k.kind === "note" ? k.id : null; },
     // where a point of the scene is on the page now (client coordinates), for a host that points at something
     pageAt(at) { orbit.apply(); const p = project(stage, at), b = stage.canvas.getBoundingClientRect(); return p && { x: p.x + b.left, y: p.y + b.top }; },
-    update(inputs) { scene.update(inputs || {}); invalidate(); },
+    update(inputs) { scene.update(inputs || {}); refit(); invalidate(); },
     stat: () => scene.stat(),
     today: () => (scene.today ? scene.today() : null),
     // how the view is turned now; with { yaw, pitch, dist } (any of them), turns it there

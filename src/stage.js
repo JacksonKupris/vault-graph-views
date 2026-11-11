@@ -3,7 +3,7 @@
 //   fog    [near, far] in stage units, or false
 //   light  "fixed" (a sun over the scene) or "camera" (over the viewer's left shoulder however the model is turned,
 //          as a model held in the hand is lit)
-import { WebGLRenderer, Scene, PerspectiveCamera, AmbientLight, DirectionalLight, Color, Fog } from "three";
+import { WebGLRenderer, Scene, PerspectiveCamera, AmbientLight, DirectionalLight, Color, Fog, Box3, Sphere, Vector3 } from "three";
 
 export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0.6 } = {}) {
   const renderer = new WebGLRenderer({ antialias: true });
@@ -24,15 +24,33 @@ export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0
     camera.updateProjectionMatrix();
   }
   resize();
+  // Where the scene really is: its centre and the radius of a sphere round everything drawn, so a layout of any scale
+  // (a few units or a few thousand) is framed the same way. fit(homeDist) is called when the scene is built or changes;
+  // orbit() then looks at the centre and stands back in proportion to the radius.
+  const centre = new Vector3(), ball = new Sphere(), box = new Box3(), part = new Box3(); let fitK = 1;
+  function fit(homeDist) {
+    box.makeEmpty();
+    scene.updateMatrixWorld(true);   // a scaled or turned parent (the Cas9 model) must be in place before it is measured
+    scene.traverse(o => {
+      if (!(o.isMesh || o.isLine || o.isPoints)) return;
+      if (o.isInstancedMesh) { o.computeBoundingBox(); part.copy(o.boundingBox).applyMatrix4(o.matrixWorld); box.union(part); }
+      else box.expandByObject(o);
+    });
+    if (box.isEmpty()) { centre.set(0, 0, 0); fitK = 1; return; }
+    box.getBoundingSphere(ball);
+    if (!Number.isFinite(ball.radius) || ball.radius <= 0) { centre.set(0, 0, 0); fitK = 1; return; }
+    centre.copy(ball.center);
+    fitK = Math.max(0.3, Math.min(30, (2.4 * ball.radius) / homeDist));   // 2.4 radii back fits a sphere in a 50 degree view
+  }
   return {
-    renderer, scene, camera, resize, canvas: renderer.domElement,
+    renderer, scene, camera, resize, canvas: renderer.domElement, fit, centre,
     // on a page taller than it is wide (a phone) the camera stands further back, so a scene fits the width too;
     // the fog stands back with it, or the scene would fade into it
     orbit(yaw, pitch, far) {
-      const back = 1 / Math.min(1, camera.aspect * 1.15), dist = far * back;
+      const back = fitK / Math.min(1, camera.aspect * 1.15), dist = far * back;
       if (fog) { scene.fog.near = fog[0] * back; scene.fog.far = fog[1] * back; }
-      camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist);
-      camera.lookAt(0, 0, 0);
+      camera.position.set(centre.x + Math.sin(yaw) * Math.cos(pitch) * dist, centre.y + Math.sin(pitch) * dist, centre.z + Math.cos(yaw) * Math.cos(pitch) * dist);
+      camera.lookAt(centre);
       camera.updateMatrixWorld();   // so a pick or a label placed before the next frame uses this view
     },
     render() { renderer.render(scene, camera); },

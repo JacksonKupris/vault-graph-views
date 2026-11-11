@@ -25,7 +25,9 @@ export const slime = {
     const byId = new Map(data.nodes.map(x => [x.id, x])), name = i => byId.get(S.ids[i]).name, at = new Map(S.ids.map((id, i) => [id, i]));
     const hub = new Set(S.hubs), peak = Math.max(...S.D, 1e-12), add = o => { stage.scene.add(o); return o; };
     const xs = S.pos.map(p => p[0]), zs = S.pos.map(p => p[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
-    const place = i => [S.pos[i][0] - cx, S.pos[i][1] - cz];
+    // the layout is drawn at one size whatever the vault's: its farthest note sits RADIUS from the middle, so it fits the first view
+    const RADIUS = 20, reach = Math.max(1e-9, ...S.pos.map(p => Math.hypot(p[0] - cx, p[1] - cz))), fit = RADIUS / reach;
+    const place = i => [(S.pos[i][0] - cx) * fit, (S.pos[i][1] - cz) * fit];
     // a note rises with the flow through it, so the backbone stands up as a ridge and the faded links lie in the valley
     const RISE = 9, high = new Float64Array(n), pins = [], lift = i => [place(i)[0], high[i], place(i)[1]];
     const heights = () => { const through = new Float64Array(n); S.bars.forEach(([i, j], e) => { const w = current[e] / peak; through[i] += w; through[j] += w; }); const top = Math.max(...through, 1e-9); for (let i = 0; i < n; i++) high[i] = RISE * Math.sqrt(through[i] / top) * (hub.has(i) ? 1 : 0.85); };
