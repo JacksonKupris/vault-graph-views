@@ -1,3 +1,4 @@
 node_modules/
-dist/
+dist/*
+!dist/vault-graph-views.js
 .out/
