@@ -17,6 +17,7 @@ const css = (el, style) => { Object.assign(el.style, style); return el; };
 export function makeFrame(el, t) {
   if (getComputedStyle(el).position === "static") el.style.position = "relative";
   const halo = `0 0 3px ${t.bg}, 0 0 3px ${t.bg}, 0 1px 2px ${t.bg}`;
+  const backing = `color-mix(in srgb, ${t.bg} 72%, transparent)`;   // a label stays readable over the tubes and lines behind it
   const make = (tag, style, parent) => { const n = document.createElement(tag); css(n, style); (parent || root).appendChild(n); return n; };
   const root = css(document.createElement("div"), { position: "absolute", inset: "0", pointerEvents: "none", overflow: "hidden", font: "13px system-ui, sans-serif", color: t.fg, userSelect: "none" });
   root.className = "vgv-frame";
@@ -81,8 +82,8 @@ export function makeFrame(el, t) {
     labels(list) {
       labelsEl.replaceChildren();
       pinned = list.map(l => {
-        const style = { position: "absolute", left: "0", top: "0", whiteSpace: "nowrap", color: l.color || t.fg, textShadow: halo, font: `${l.strong ? "700 15px" : "11px"} system-ui, sans-serif`, willChange: "transform" };
-        const n = l.run ? button(labelsEl, { label: l.text, title: l.title, run: l.run }, Object.assign(style, { minHeight: "0", minWidth: "0", padding: "3px 4px", border: "none", background: "transparent" })) : make("div", style, labelsEl);
+        const style = { position: "absolute", left: "0", top: "0", whiteSpace: "nowrap", color: l.color || t.fg, textShadow: halo, font: `${l.strong ? "700 15px" : "12px"} system-ui, sans-serif`, willChange: "transform", background: backing, borderRadius: "5px", padding: "1px 5px" };
+        const n = l.run ? button(labelsEl, { label: l.text, title: l.title, run: l.run }, Object.assign(style, { minHeight: "0", minWidth: "0", padding: "3px 5px", border: "none", background: backing })) : make("div", style, labelsEl);
         if (!l.run) n.textContent = l.text;
         return { l, n, w: n.offsetWidth, h: n.offsetHeight };
       });

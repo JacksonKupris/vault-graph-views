@@ -12,7 +12,7 @@ export const FRAMES_PER_SECOND = 8, CARRY = 0.1;
 
 export const slime = {
   id: "slime", name: "Slime mould", hint: "Which written links carry the vault, and which fade away",
-  home: { yaw: 0.6, pitch: 1.0, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100] },
+  home: { yaw: 0.6, pitch: 0.75, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100] },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const S = vaultSlime(data.nodes, data.links, { max: 80 }), n = S.ids.length, T = S.frames.length - 1;
@@ -25,7 +25,12 @@ export const slime = {
     const byId = new Map(data.nodes.map(x => [x.id, x])), name = i => byId.get(S.ids[i]).name, at = new Map(S.ids.map((id, i) => [id, i]));
     const hub = new Set(S.hubs), peak = Math.max(...S.D, 1e-12), add = o => { stage.scene.add(o); return o; };
     const xs = S.pos.map(p => p[0]), zs = S.pos.map(p => p[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
-    const place = i => [S.pos[i][0] - cx, S.pos[i][1] - cz];
+    // the layout is drawn at one size whatever the vault's: its farthest note sits RADIUS from the middle, so it fits the first view
+    const RADIUS = 20, reach = Math.max(1e-9, ...S.pos.map(p => Math.hypot(p[0] - cx, p[1] - cz))), fit = RADIUS / reach;
+    const place = i => [(S.pos[i][0] - cx) * fit, (S.pos[i][1] - cz) * fit];
+    // a note rises with the flow through it, so the backbone stands up as a ridge and the faded links lie in the valley
+    const RISE = 9, high = new Float64Array(n), pins = [], lift = i => [place(i)[0], high[i], place(i)[1]];
+    const heights = () => { const through = new Float64Array(n); S.bars.forEach(([i, j], e) => { const w = current[e] / peak; through[i] += w; through[j] += w; }); const top = Math.max(...through, 1e-9); for (let i = 0; i < n; i++) high[i] = RISE * Math.sqrt(through[i] / top) * (hub.has(i) ? 1 : 0.85); };
     const m = new Matrix4(), col = new Color(), faded = new Color(theme.bg).lerp(new Color(theme.muted), 0.55), carry = new Color("#f59e0b"), food = new Color(theme.accent || "#38bdf8"), ink = new Color(theme.fg);
     const up = new Vector3(0, 1, 0), dir = new Vector3(), mid = new Vector3(), q = new Quaternion(), sc = new Vector3();
     const tubes = add(new InstancedMesh(new CylinderGeometry(1, 1, 1, 10, 1), new MeshStandardMaterial({ roughness: 0.5 }), S.bars.length));
@@ -36,7 +41,7 @@ export const slime = {
     const widths = () => { const a = S.frames[Math.floor(t)], b = S.frames[Math.min(T, Math.floor(t) + 1)], f = t - Math.floor(t); return Array.from(a, (x, e) => x + (b[e] - x) * f); };
     const carrying = w => w.filter(x => x / peak >= CARRY).length;
     const size = i => (hub.has(i) ? 0.75 : 0.4);
-    let current = widths();
+    let current = widths(); heights();
     const stat = () => {
       const f = hovered != null ? hovered : selected;
       if (f != null) { const own = S.bars.map((b, e) => (b[0] === f || b[1] === f ? e : -1)).filter(e => e >= 0), keep = own.filter(e => current[e] / peak >= CARRY).length; return `${name(f)} · ${hub.has(f) ? "hub · " : ""}${keep} of ${plural(own.length, "link")} carry on`; }
@@ -51,31 +56,34 @@ export const slime = {
       ] });
     }
     function labels() {
-      const out = [], f = hovered != null ? hovered : selected;
-      for (const i of S.hubs.slice(0, 4)) if (i !== f) out.push({ text: clip(name(i), 30), at: [place(i)[0], 0, place(i)[1]], dy: -16, color: theme.accent });
-      if (f != null) out.push({ text: clip(name(f), 34), at: [place(f)[0], 0, place(f)[1]], strong: true, dy: -20, run: () => open(f), title: `Open ${name(f)}` });
+      const out = [], f = hovered != null ? hovered : selected; pins.length = 0;
+      const pin = (i, l) => { l.at = lift(i); pins.push([i, l.at]); out.push(l); };   // shape() moves the point as the note rises
+      for (const i of S.hubs.slice(0, 4)) if (i !== f) pin(i, { text: clip(name(i), 30), dy: -16, color: theme.accent });
+      if (f != null) pin(f, { text: clip(name(f), 34), strong: true, dy: -20, run: () => open(f), title: `Open ${name(f)}` });
       frame.labels(out);
     }
     function refresh() { current = widths(); shape(); labels(); controls(); frame.stat(stat()); }
     function shape() {
+      heights();
       S.bars.forEach(([i, j], e) => {
-        const [ax, az] = place(i), [bx, bz] = place(j), w = Math.min(1, current[e] / peak), r = 0.05 + 0.4 * Math.sqrt(w);
-        dir.set(bx - ax, 0, bz - az); const len = dir.length() || 1e-6; dir.normalize(); mid.set((ax + bx) / 2, 0, (az + bz) / 2);
+        const [ax, ay, az] = lift(i), [bx, by, bz] = lift(j), w = Math.min(1, current[e] / peak), r = 0.05 + 0.4 * Math.sqrt(w);
+        dir.set(bx - ax, by - ay, bz - az); const len = dir.length() || 1e-6; dir.normalize(); mid.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2);
         q.setFromUnitVectors(up, dir); sc.set(r, len, r); m.compose(mid, q, sc); tubes.setMatrixAt(e, m);
         col.copy(faded).lerp(carry, Math.min(1, Math.sqrt(w) * 1.1)); tubes.setColorAt(e, col);
       });
       tubes.instanceMatrix.needsUpdate = true; if (tubes.instanceColor) tubes.instanceColor.needsUpdate = true;
       for (let i = 0; i < n; i++) {
-        const [x, z] = place(i), f = i === (hovered != null ? hovered : selected), r = size(i) * (f ? 1.4 : 1);
-        m.makeScale(r, r, r).setPosition(x, 0, z); beads.setMatrixAt(i, m);
+        const [x, y, z] = lift(i), f = i === (hovered != null ? hovered : selected), r = size(i) * (f ? 1.4 : 1);
+        m.makeScale(r, r, r).setPosition(x, y, z); beads.setMatrixAt(i, m);
         col.copy(hub.has(i) ? food : faded).lerp(ink, hub.has(i) ? 0 : 0.35); if (f) col.copy(ink); beads.setColorAt(i, col);
       }
+      for (const [i, a] of pins) a[1] = high[i];
       beads.instanceMatrix.needsUpdate = true; if (beads.instanceColor) beads.instanceColor.needsUpdate = true;
     }
     function open(i) { selected = i; refresh(); invalidate(); onOpen(S.ids[i]); }
-    const targets = () => S.ids.map((id, i) => { const [x, z] = place(i); return { at: [x, 0, z], r: size(i) * 1.3, key: { kind: "note", id, tip: `${name(i)}${hub.has(i) ? " · hub" : ""}` } }; });
+    const targets = () => S.ids.map((id, i) => { return { at: lift(i), r: size(i) * 1.3, key: { kind: "note", id, tip: `${name(i)}${hub.has(i) ? " · hub" : ""}` } }; });
     const I = slimeInsights({ n, bars: S.bars, kept: S.kept, hubs: S.hubs, order: S.ids.map((_, i) => i) }, name);
-    frame.explain({ plain: I.plain, about: I.about, legend: [{ color: "#f59e0b", text: "carries flow" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }],
+    frame.explain({ plain: I.plain, about: I.about, legend: [{ color: "#f59e0b", text: "carries flow (higher = more)" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }],
       insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; t = T; playing = false; refresh(); invalidate(); } } })) });
     refresh();
     return {

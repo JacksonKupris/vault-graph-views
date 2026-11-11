@@ -15,7 +15,7 @@ import { nearest, project } from "./pick.js";
 export function runScene(el, def, o) {
   const stage = makeStage(el, o.theme, def.stage), frame = makeFrame(el, o.theme);
   let raf = 0, dead = false, over = null;
-  const settle = () => { orbit.apply(); if (scene.frame) scene.frame(); frame.place(stage); };
+  const settle = () => { if (stage.changed()) refit(); orbit.apply(); if (scene.frame) scene.frame(); frame.place(stage); };
   const draw = () => { raf = 0; if (dead) return; settle(); stage.render(); };
   const invalidate = () => { if (!raf && !dead) raf = requestAnimationFrame(draw); };
   const keyAt = (x, y) => { const b = stage.canvas.getBoundingClientRect(); orbit.apply(); return nearest(stage, scene.targets(), x - b.left, y - b.top); };
@@ -32,7 +32,8 @@ export function runScene(el, def, o) {
     },
   });
   const scene = def.build({ stage, frame, orbit, invalidate, ...o });
-  invalidate();
+  const refit = () => stage.fit((def.home && def.home.dist) || 48);   // the camera is framed to what the scene really drew
+  refit(); invalidate();
   return {
     view: def.id,
     resize() { stage.resize(); invalidate(); },
@@ -42,7 +43,7 @@ export function runScene(el, def, o) {
     noteAt(x, y) { const k = keyAt(x, y); return k && k.kind === "note" ? k.id : null; },
     // where a point of the scene is on the page now (client coordinates), for a host that points at something
     pageAt(at) { orbit.apply(); const p = project(stage, at), b = stage.canvas.getBoundingClientRect(); return p && { x: p.x + b.left, y: p.y + b.top }; },
-    update(inputs) { scene.update(inputs || {}); invalidate(); },
+    update(inputs) { scene.update(inputs || {}); refit(); invalidate(); },
     stat: () => scene.stat(),
     today: () => (scene.today ? scene.today() : null),
     // how the view is turned now; with { yaw, pitch, dist } (any of them), turns it there
