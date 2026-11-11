@@ -4,6 +4,8 @@
 //   stat(text)                          one line, top left
 //   controls({ at, lines, buttons })    the next step. at "bottom" (default) or "centre" (an empty state);
 //                                       lines [text...] first is the main one; buttons [{ label, title, run, off }]
+//   explain({ legend, about, insights })  what the colours mean (legend [{color, text}], always shown under the stat line) and a card behind
+//                                       an Insights button: about (how the notes relate to the formula), insights [{ text, label, run }]
 //   chip(text, clear)                   a filter in force, with its way out; chip(null) takes it away
 //   labels([{ text, at, color, dy, run, title, strong }])   names pinned to points of the scene, first wins a clash
 //   tip(text, x, y)                     at a point of the canvas; tip(null) hides it
@@ -21,12 +23,18 @@ export function makeFrame(el, t) {
   el.appendChild(root);
   const statEl = make("div", { position: "absolute", left: "12px", top: "10px", right: "12px", color: t.muted, textShadow: halo });
   statEl.className = "vgv-stat";
+  const legendEl = make("div", { position: "absolute", left: "12px", top: "34px", right: "12px", display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: "11px", color: t.muted, textShadow: halo });
+  legendEl.className = "vgv-legend";
+  const cardEl = make("div", { position: "absolute", left: "10px", right: "10px", bottom: "112px", maxHeight: "55%", overflowY: "auto", display: "none", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "10px", background: t.bg, border: `1px solid ${t.muted}`, pointerEvents: "auto", userSelect: "text" });
+  cardEl.className = "vgv-insights";
   const chipEl = make("div", { position: "absolute", top: "34px", left: "0", right: "0", display: "none", justifyContent: "center" });
   const labelsEl = make("div", { position: "absolute", inset: "0" });
+  labelsEl.className = "vgv-labels";
   const controlsEl = make("div", { position: "absolute", left: "0", right: "0", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "0 12px" });
   controlsEl.className = "vgv-controls";
   const tipEl = make("div", { position: "absolute", display: "none", maxWidth: "260px", padding: "4px 8px", borderRadius: "6px", background: t.bg, border: `1px solid ${t.muted}`, color: t.fg, fontSize: "12px" });
   tipEl.className = "vgv-tip";
+  root.appendChild(cardEl);   // last, so labels and the tip draw under the card
 
   // every style a host's own button rules could change is set here, so a theme can't restyle or resize it
   function button(parent, { label, title, run, off }, style) {
@@ -37,10 +45,28 @@ export function makeFrame(el, t) {
     b.addEventListener("click", e => { e.stopPropagation(); run(); });
     return b;
   }
-  let pinned = [];
+  let pinned = [], info = null, cardOpen = false, lastControls = {};
+  const drawCard = () => {
+    cardEl.style.display = info && cardOpen ? "flex" : "none"; cardEl.replaceChildren();
+    if (!info || !cardOpen) return;
+    if (info.about) make("div", { color: t.fg, lineHeight: "1.35" }, cardEl).textContent = info.about;
+    for (const it of info.insights || []) {
+      const row = make("div", { display: "flex", gap: "8px", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }, cardEl);
+      make("div", { color: t.muted, flex: "1 1 160px", lineHeight: "1.35" }, row).textContent = it.text;
+      if (it.run) button(row, { label: it.label || "Show", title: it.title || it.label || "Show", run: it.run }, { minHeight: "30px", padding: "4px 10px", fontWeight: "500" });
+    }
+  };
   return {
     stat(text) { statEl.textContent = text || ""; },
-    controls({ at = "bottom", lines = [], buttons = [] } = {}) {
+    explain(next) {
+      info = next || null; legendEl.replaceChildren();
+      for (const l of (info && info.legend) || []) { const it = make("span", { display: "inline-flex", alignItems: "center", gap: "5px" }, legendEl); make("i", { width: "9px", height: "9px", borderRadius: "50%", background: l.color, display: "inline-block", flex: "none" }, it); make("span", {}, it).textContent = l.text; }
+      if (!info) cardOpen = false;
+      drawCard(); this.controls(lastControls);
+    },
+    controls(spec = {}) {
+      lastControls = spec; const { at = "bottom", lines = [], buttons: own = [] } = spec;
+      const buttons = info && at === "bottom" ? [...own, { label: cardOpen ? "Close" : "Insights", title: cardOpen ? "Close the insights" : "How the notes relate to this view and how to improve them", run: () => { cardOpen = !cardOpen; drawCard(); this.controls(lastControls); } }] : own;
       controlsEl.replaceChildren();
       css(controlsEl, at === "centre" ? { top: "50%", bottom: "auto", transform: "translateY(-50%)" } : { top: "auto", bottom: "18px", transform: "none" });
       lines.forEach((text, i) => { make("div", { textAlign: "center", textShadow: halo, color: i || at !== "centre" ? t.muted : t.fg, fontWeight: i || at !== "centre" ? "400" : "600", fontSize: i || at !== "centre" ? "13px" : "14px" }, controlsEl).textContent = text; });
@@ -72,7 +98,7 @@ export function makeFrame(el, t) {
         if (show) {
           // centred on its point (or to its right, side: "right"), kept on the page and clear of the stat line and the buttons
           x = Math.max(6, Math.min(W - w - 6, l.side === "right" ? p.x + (l.dx || 0) : p.x - w / 2));
-          y = Math.max(34, Math.min(H - 110, p.y + (l.dy || 0) - h / 2));
+          y = Math.max(34 + (legendEl.offsetHeight ? legendEl.offsetHeight + 6 : 0), Math.min(H - 110, p.y + (l.dy || 0) - h / 2));
           show = !taken.some(r => x < r[0] + r[2] && x + w > r[0] && y < r[1] + r[3] && y + h > r[1]);
         }
         n.style.display = show ? "" : "none";

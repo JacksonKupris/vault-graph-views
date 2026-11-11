@@ -5,6 +5,7 @@
 //   inputs.selected the host's selected note · onOpen(id) a note · onAction("graph")
 // The maths is modes.js; this only draws it.
 import { InstancedMesh, SphereGeometry, MeshStandardMaterial, Matrix4, Color, PlaneGeometry, Mesh, BufferGeometry, BufferAttribute, LineSegments, LineBasicMaterial, DoubleSide, Float32BufferAttribute } from "three";
+import { modeInsights } from "../insights.js";
 import { plural, clip } from "../text.js";
 import { vaultModes, halves } from "../modes.js";
 
@@ -12,7 +13,7 @@ export const UP = "#f59e0b", DOWN = "#38bdf8", RISE = 6, GRID = 44;
 
 export const modes = {
   id: "modes", name: "Normal modes", hint: "How the vault would ring: its natural cuts into halves",
-  home: { yaw: 0.7, pitch: 0.42, dist: 48, min: 14, max: 110 }, stage: { fog: [40, 100] },
+  home: { yaw: 0.7, pitch: 0.8, dist: 50, min: 14, max: 110 }, stage: { fog: [40, 100] },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const V = vaultModes(data.nodes, data.links, { max: 80 }), n = V.ids.length;
@@ -23,7 +24,7 @@ export const modes = {
       return { targets: () => [], click() {}, update() {}, stat, today: () => null, api: { empty: true } };
     }
     const byId = new Map(data.nodes.map(x => [x.id, x])), name = i => byId.get(V.ids[i]).name, at = new Map(V.ids.map((id, i) => [id, i]));
-    const up = new Color(UP), down = new Color(DOWN), still = new Color(theme.bg).lerp(new Color(theme.muted), 0.35), m = new Matrix4(), col = new Color();
+    const up = new Color(UP), down = new Color(DOWN), still = new Color(theme.bg).lerp(new Color(theme.muted), 0.12), m = new Matrix4(), col = new Color();
     const add = o => { stage.scene.add(o); return o; };
     const xs = V.pos.map(p => p[0]), zs = V.pos.map(p => p[1]), pad = 2, x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, z0 = Math.min(...zs) - pad, z1 = Math.max(...zs) + pad;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, spanX = x1 - x0, spanZ = z1 - z0;
@@ -81,6 +82,11 @@ export const modes = {
       }
       colors.needsUpdate = true; refresh();
     }
+    function explain() {
+      const I = modeInsights({ bars: V.bars, vector: mode().vector, freq: mode().freq, k, count: V.modes.length }, name);
+      frame.explain({ about: I.about, legend: [{ color: UP, text: "swings up" }, { color: DOWN, text: "swings down" }, { color: theme.muted, text: "nodal line, still" }],
+        insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; setMode(k); } } })) });
+    }
     function refresh() { labels(); frame.stat(stat()); }
     function shape() {   // what depends on the time: heights
       const v = mode().vector, s = sway(), pos = sheet.attributes.position;
@@ -97,13 +103,13 @@ export const modes = {
       }
       beads.instanceMatrix.needsUpdate = true; if (beads.instanceColor) beads.instanceColor.needsUpdate = true;
     }
-    function setMode(next) { k = Math.max(0, Math.min(V.modes.length - 1, next)); paintStill(); controls(); shape(); invalidate(); }
+    function setMode(next) { k = Math.max(0, Math.min(V.modes.length - 1, next)); paintStill(); explain(); controls(); shape(); invalidate(); }
     function open(i) { selected = i; refresh(); shape(); invalidate(); onOpen(V.ids[i]); }
     const targets = () => V.ids.map((id, i) => { const [x, z] = place(i); return { at: [x, height[i] + 0.4, z], r: size(i) * 1.2, key: { kind: "note", id, tip: `${name(i)} · ${Math.abs(swing(i)) < 0.05 ? "still" : swing(i) > 0 ? "up" : "down"} ${Math.abs(swing(i)).toFixed(2)}` } }; });
     // a note moving under a finger is hard to hit: the sheet holds while a finger or the mouse is down, and rings again a moment after
     const down_ = () => { touching = true; clearTimeout(settle); }, up_ = () => { clearTimeout(settle); settle = setTimeout(() => { touching = false; last = null; invalidate(); }, 1500); };
     stage.canvas.addEventListener("pointerdown", down_, true); addEventListener("pointerup", up_); addEventListener("pointercancel", up_);
-    paintStill(); controls(); shape();
+    explain(); paintStill(); controls(); shape();
     return {
       targets,
       click(key) { if (key.kind === "note") open(at.get(key.id)); },

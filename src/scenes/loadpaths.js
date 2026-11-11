@@ -4,6 +4,7 @@
 //   data.nodes[]   .tasks (open tasks), the rest as importance needs · data.links  the written links (kind "link")
 //   inputs.selected the host's selected note · onOpen(id) a note · onAction("graph")
 // The maths is truss.js; this only draws it.
+import { loadInsights } from "../insights.js";
 import { InstancedMesh, SphereGeometry, CylinderGeometry, MeshStandardMaterial, Matrix4, Quaternion, Vector3, Color } from "three";
 import { importanceOf } from "../notes.js";
 import { plural, clip } from "../text.js";
@@ -11,11 +12,11 @@ import { solveTruss, vaultTruss, readTruss } from "../truss.js";
 
 // how much a note resists being pushed sideways, as a share of one bar: a note on a single link would otherwise sag without limit
 export const SWAY = 0.01;
-export const TENSION = "#60a5fa", COMPRESSION = "#f87171";
+export const TENSION = "#60a5fa", COMPRESSION = "#f87171", GROUND = "#f59e0b";
 
 export const loadpaths = {
   id: "loadpaths", name: "Load paths", hint: "Which links carry the vault, and which note sags first",
-  home: { yaw: 0.6, pitch: 0.25, dist: 46, min: 12, max: 110 }, stage: { fog: [38, 90] },
+  home: { yaw: 0.6, pitch: 0.65, dist: 46, min: 12, max: 110 }, stage: { fog: [38, 90] },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const T = vaultTruss(data.nodes, data.links);
@@ -50,7 +51,7 @@ export const loadpaths = {
         const r = size(i) * (i === f ? 1.4 : 1);
         m.makeScale(r, r, r).setPosition(...T.pos[i]); joints.setMatrixAt(i, m);
         const dim = (f != null || bar != null) && i !== f && !lit.has(i) && !barsOf(i).some(b => mine.has(b));
-        col.set(grounded.has(i) ? theme.accent : pal[(byId.get(T.ids[i]).cluster || 0) % pal.length]); if (i === f) col.set(theme.fg); if (dim) col.multiplyScalar(0.25);
+        col.set(grounded.has(i) ? GROUND : pal[(byId.get(T.ids[i]).cluster || 0) % pal.length]); if (i === f) col.set(theme.fg); if (dim) col.multiplyScalar(0.25);
         joints.setColorAt(i, col);
       }
       T.bars.forEach(([i, j], b) => {
@@ -73,7 +74,12 @@ export const loadpaths = {
     const mid = b => [0, 1, 2].map(k => (T.pos[T.bars[b][0]][k] + T.pos[T.bars[b][1]][k]) / 2);
     const targets = [...T.ids.map((id, i) => ({ at: T.pos[i], r: size(i), key: { kind: "note", id, tip: `${name(i)} · ${grounded.has(i) ? "ground" : `sags ${R.sag[i].toFixed(2)}`}` } })),
       ...T.bars.map((p, b) => ({ at: mid(b), r: Math.max(thick(b) * 2, 0.35), key: { kind: "bar", id: String(b), tip: `${name(p[0])} – ${name(p[1])} · ${kind(b)} with ${amount(b)}` } }))];
-    paint();
+    const explain = () => {
+      const I = loadInsights({ n, bars: T.bars, ground: T.ground, sag: R.sag, sagging: R.sagging, weakest: R.weakest, busiest: R.busiest, carry: R.carry }, name);
+      frame.explain({ about: I.about, legend: [{ color: TENSION, text: "pulled" }, { color: COMPRESSION, text: "pushed" }, { color: GROUND, text: "ground" }, { color: theme.muted, text: "thicker bar = more load" }],
+        insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.bar != null) { bar = it.bar; selected = null; paint(); invalidate(); } else open(it.note); } })) });
+    };
+    explain(); paint();
     return {
       targets: () => targets,
       click(k) { if (k.kind === "note") open(at.get(k.id)); else if (k.kind === "bar") { bar = +k.id; selected = null; paint(); invalidate(); } },
