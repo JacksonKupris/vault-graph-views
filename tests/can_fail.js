@@ -16,6 +16,8 @@ const BREAKS = [
   { what: "the fog doesn't stand back with the camera on a phone", file: "src/stage.js", from: "scene.fog.far = fog[1] * back;", to: "scene.fog.far = fog[1];", test: "test_phone.js" },
   { what: "a fold of other journals is let through", file: "src/contract.js", from: "if (f.n !== s.days.length || f.X.length !== f.n)", to: "if (false)", test: "test_contract.js" },
   { what: "a match on a person's note counts as a site", file: "src/models/cas9.js", from: "!special(n)", to: "true", test: "test_models.js" },
+  { what: "a bar's stiffness ignores its length", file: "src/truss.js", from: "s /= L;", to: "s /= 1;", test: "test_truss.js" },
+  { what: "a click on a bar opens a note", file: "src/scenes/loadpaths.js", from: `else if (k.kind === "bar") { bar = +k.id;`, to: `else if (k.kind === "bar") { onOpen(T.ids[0]); bar = +k.id;`, test: "test_loadpaths.js" },
 ];
 
 const only = process.argv[2];
