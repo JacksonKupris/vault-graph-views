@@ -29,7 +29,7 @@ export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0
   // percentile of their distance from it, so a few far outliers (one stray note) do not shrink the rest to a speck.
   // fit(homeDist) is called when the scene is built or changes; orbit() then looks at the centre and stands back in
   // proportion to the radius. changed() says whether what the scene holds is not what fit() last measured.
-  const centre = new Vector3(), box = new Box3(), at = new Vector3(), mat = new Matrix4(), corner = new Vector3(); let fitK = 1, seen = "";
+  const centre = new Vector3(), tmp = new Vector3(), box = new Box3(), at = new Vector3(), mat = new Matrix4(), corner = new Vector3(); let fitK = 1, seen = "";
   const holds = () => { let n = 0; scene.traverse(o => { if (o.isMesh || o.isLine || o.isPoints) n += 1 + (o.isInstancedMesh ? o.count : 0) + (o.geometry && o.geometry.attributes.position ? o.geometry.attributes.position.count : 0); }); return n; };
   const mid = v => { v.sort((p, q) => p - q); const n = v.length; return (v[Math.floor(n * 0.02)] + v[Math.min(n - 1, Math.floor(n * 0.98))]) / 2; };
   function fit(homeDist) {
@@ -52,11 +52,12 @@ export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0
     renderer, scene, camera, resize, canvas: renderer.domElement, fit, changed: () => holds() !== seen, centre,
     // on a page taller than it is wide (a phone) the camera stands further back, so a scene fits the width too;
     // the fog stands back with it, or the scene would fade into it
-    orbit(yaw, pitch, far) {
+    orbit(yaw, pitch, far, pan) {
       const back = fitK / Math.min(1, camera.aspect * 1.15), dist = far * back;
+      const at = pan ? (tmp.set(centre.x + pan.x * dist, centre.y, centre.z + pan.z * dist), tmp) : centre;   // a flat scene slid across the ground
       if (fog) { scene.fog.near = fog[0] * back; scene.fog.far = fog[1] * back; }
-      camera.position.set(centre.x + Math.sin(yaw) * Math.cos(pitch) * dist, centre.y + Math.sin(pitch) * dist, centre.z + Math.cos(yaw) * Math.cos(pitch) * dist);
-      camera.lookAt(centre);
+      camera.position.set(at.x + Math.sin(yaw) * Math.cos(pitch) * dist, at.y + Math.sin(pitch) * dist, at.z + Math.cos(yaw) * Math.cos(pitch) * dist);
+      camera.lookAt(at);
       camera.updateMatrixWorld();   // so a pick or a label placed before the next frame uses this view
     },
     render() { renderer.render(scene, camera); },
