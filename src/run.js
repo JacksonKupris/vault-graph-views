@@ -14,8 +14,10 @@ import { nearest, project } from "./pick.js";
 
 export function runScene(el, def, o) {
   const stage = makeStage(el, o.theme, def.stage), frame = makeFrame(el, o.theme);
-  let raf = 0, dead = false, over = null;
-  const settle = () => { if (stage.changed()) refit(); orbit.apply(); if (scene.frame) scene.frame(); frame.place(stage); };
+  let raf = 0, dead = false, over = null, marks = new Map();
+  // a ring on each marked note the scene shows (every scene lists its notes in targets(), kind "note")
+  const ring = () => frame.rings(marks.size ? scene.targets().filter(k => k.key.kind === "note" && marks.has(k.key.id)).map(k => ({ at: k.at, r: k.r, n: marks.get(k.key.id) })) : [], stage);
+  const settle = () => { if (stage.changed()) refit(); orbit.apply(); if (scene.frame) scene.frame(); frame.place(stage); ring(); };
   const draw = () => { raf = 0; if (dead) return; settle(); stage.render(); };
   const invalidate = () => { if (!raf && !dead) raf = requestAnimationFrame(draw); };
   const keyAt = (x, y) => { const b = stage.canvas.getBoundingClientRect(); orbit.apply(); return nearest(stage, scene.targets(), x - b.left, y - b.top); };
@@ -43,6 +45,8 @@ export function runScene(el, def, o) {
     noteAt(x, y) { const k = keyAt(x, y); return k && k.kind === "note" ? k.id : null; },
     // where a point of the scene is on the page now (client coordinates), for a host that points at something
     pageAt(at) { orbit.apply(); const p = project(stage, at), b = stage.canvas.getBoundingClientRect(); return p && { x: p.x + b.left, y: p.y + b.top }; },
+    // notes the host wants to stand out: Map or object of note id -> how many things are wrong (1 or more), with the legend text; null or empty clears
+    mark(notes, text) { marks = notes instanceof Map ? notes : new Map(Object.entries(notes || {})); frame.mark(marks.size ? text || "needs attention" : null); invalidate(); },
     update(inputs) { scene.update(inputs || {}); refit(); invalidate(); },
     stat: () => scene.stat(),
     today: () => (scene.today ? scene.today() : null),

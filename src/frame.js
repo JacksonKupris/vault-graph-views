@@ -46,7 +46,15 @@ export function makeFrame(el, t) {
     b.addEventListener("click", e => { e.stopPropagation(); run(); });
     return b;
   }
-  let pinned = [], info = null, cardOpen = false, lastControls = {};
+  let pinned = [], info = null, cardOpen = false, lastControls = {}, markText = null;
+  // the host's marked notes: a ring on each and one legend item (see rings, mark)
+  const ringEls = [];
+  const markLegend = () => {
+    const old = legendEl.querySelector(".vgv-mark"); if (old) old.remove();
+    if (!markText) return;
+    const it = make("span", { display: "inline-flex", alignItems: "center", gap: "5px" }, legendEl); it.className = "vgv-mark";
+    make("i", { width: "9px", height: "9px", borderRadius: "50%", border: `2px solid ${t.warn}`, boxSizing: "border-box" }, it); it.append(markText);
+  };
   const drawCard = () => {
     cardEl.style.display = info && cardOpen ? "flex" : "none"; cardEl.replaceChildren();
     if (!info || !cardOpen) return;
@@ -64,7 +72,19 @@ export function makeFrame(el, t) {
       info = next || null; legendEl.replaceChildren();
       for (const l of (info && info.legend) || []) { const it = make("span", { display: "inline-flex", alignItems: "center", gap: "5px" }, legendEl); make("i", { width: "9px", height: "9px", borderRadius: "50%", background: l.color, display: "inline-block", flex: "none" }, it); make("span", {}, it).textContent = l.text; }
       if (!info) cardOpen = false;
-      drawCard(); this.controls(lastControls);
+      markLegend(); drawCard(); this.controls(lastControls);
+    },
+    // text: what a ring means (null takes the legend item away); the rings themselves are placed by rings()
+    mark(text) { markText = text || null; markLegend(); },
+    // items [{ at, r, n }]: a ring round each point (two rings when n > 1), kept where the point is now
+    rings(items, stage) {
+      while (ringEls.length < items.length) { const e = make("div", { position: "absolute", left: "0", top: "0", borderRadius: "50%", boxSizing: "border-box", willChange: "transform" }, labelsEl); ringEls.push(e); }
+      ringEls.forEach((e, i) => {
+        const it = items[i], p = it && project(stage, it.at);
+        if (!p) { e.style.display = "none"; return; }
+        const r = Math.max(4, Math.min(24, it.r * p.px)) + 4, d = 2 * r + (it.n > 1 ? 8 : 0);
+        css(e, { display: "", width: d + "px", height: d + "px", border: `2px solid ${t.warn}`, boxShadow: it.n > 1 ? `inset 0 0 0 2px transparent, inset 0 0 0 3.5px ${t.warn}` : "none", transform: `translate(${Math.round(p.x - d / 2)}px, ${Math.round(p.y - d / 2)}px)` });
+      });
     },
     controls(spec = {}) {
       lastControls = spec; const { at = "bottom", lines = [], buttons: own = [] } = spec;
