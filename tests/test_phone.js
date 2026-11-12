@@ -11,7 +11,7 @@ const { ev } = page, V = "window.__views";
 try {
   same("the page is phone sized", await ev("[innerWidth, innerHeight]"), [420, 900]);
   const views = await ev("VaultGraphViews.VIEWS.map(v => v.id)");
-  same("the views", views, ["bodies", "cas9", "genome", "cones", "loadpaths", "modes", "slime", "cyberpunk", "radar"]);
+  same("the views", views, ["bodies", "cas9", "genome", "cones", "loadpaths", "modes", "slime", "cyberpunk", "radar", "clock"]);
   const L = await ev("window.__DATA.nodes.filter(n => !n.ghost && !n.person && !n.moc).map(n => n.id).sort()");
   const scan = { guide: "kiosk", where: "in every note", notes: L.filter((_, i) => i % 9 === 4).map(path => ({ path, hits: 1 })) };
   for (const view of views) {
@@ -27,9 +27,16 @@ try {
     await page.shot("phone-" + view);
     // a finger on a note opens it
     await ev("window.__opened = null");
-    const note = await page.find("note");
-    ok(!!note, `${view}: a note is on screen to tap`);
-    if (note) { await page.tap(note); same(`${view}: a tap on a note opens it`, await ev("window.__opened"), note.id); }
+    // (the Heat clock draws topics, not notes: a finger on a ring picks its topic, and the host is not asked to open anything)
+    if (view === "clock") {
+      const ring = await page.find("ring");
+      ok(!!ring, `${view}: a ring is on screen to tap`);
+      if (ring) { await page.tap(ring); same(`${view}: a tap on a ring picks its topic`, await ev(`${V}.api.focus()`), ring.id); }
+    } else {
+      const note = await page.find("note");
+      ok(!!note, `${view}: a note is on screen to tap`);
+      if (note) { await page.tap(note); same(`${view}: a tap on a note opens it`, await ev("window.__opened"), note.id); }
+    }
     // a finger on nothing opens nothing
     await ev("window.__opened = null");
     const empty = (await page.grid(20)).find(p => !p.key);

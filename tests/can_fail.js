@@ -29,6 +29,8 @@ const BREAKS = [
   { what: "the Insights button is not added to the controls", file: "src/frame.js", from: 'const buttons = info && at === "bottom" ?', to: 'const buttons = false && at === "bottom" ?', test: "test_explain.js" },
   { what: "a marked note gets no ring", file: "src/run.js", from: 'k.key.kind === "note" && marks.has(k.key.id)', to: "false", test: "test_marks.js" },
   { what: "a link count in an insight is wrong", file: "src/insights.js", from: 'It is held by ${plural(deg[sagging], "link")}', to: 'It is held by ${plural(deg[sagging] + 1, "link")}', test: "test_insights.js" },
+  { what: "a click on a ring of the Heat clock doesn't pick its topic", file: "src/scenes/clock.js", from: `click(k) { if (k.kind === "ring") pick(k.id); }`, to: "click(k) {}", test: "test_clock.js" },
+  { what: "the Heat clock counts a ring's heat against all topics, not its own busiest slot", file: "src/scenes/clock.js", from: "const v = r[d.key][s], t = v / mx;", to: "const v = r[d.key][s], t = v / 99;", test: "test_clock.js" },
 ];
 
 const only = process.argv[2];
