@@ -13,6 +13,7 @@ export const DATA_SHAPE = {
   strand: { days: "array", paths: "array", ids: "array", rows: "array" },
 };
 // Optional on a node: taskAge, the days its oldest open task has waited (Radar; the note's age when absent).
+// Optional on data: rhythm, { [clusterId]: { wd: 7 counts (Monday first), mo: 12 counts (January first) } }, what the Heat clock shows.
 // inputs.fold (Genome fold): the plugin's VGScience.genomeFold(data.strand.rows), with its grade. X is a point a day.
 export const FOLD_SHAPE = { n: "number", X: "array", stress: "number", grade: "string", domains: "array", loops: "array" };
 // inputs.scan (Cas9): the Guide scan's result. notes: [{ path, hits }] (hits 0 is a look-alike). ids, when given, is the
