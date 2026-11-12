@@ -15,8 +15,9 @@ import { cones } from "./scenes/cones.js";
 import { loadpaths } from "./scenes/loadpaths.js";
 import { modes } from "./scenes/modes.js";
 import { slime } from "./scenes/slime.js";
+import { cyberpunk } from "./scenes/cyberpunk.js";
 
-const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime };
+const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk };
 export const VIEWS = Object.values(SCENES).map(s => ({ id: s.id, name: s.name, hint: s.hint, actions: s.actions || [] }));
 
 export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction, theme } = {}) {
