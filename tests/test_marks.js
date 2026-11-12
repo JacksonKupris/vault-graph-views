@@ -22,5 +22,13 @@ try {
     await ev(`${V}.mark(null)`); await page.drawn();
     same(`${view}: clearing takes the rings and the legend item away`, [await rings(), (await legend()).length], [0, 0]);
   }
+  // a host can lay the overlay out lower than the canvas (the plugin has a toolbar above it): a ring still sits on its note
+  if (await page.mount("slime") === null) {
+    await page.drawn();
+    const note = (await page.grid(16)).find(p => p.key && p.key.kind === "note");
+    await ev(`document.querySelector(".vgv-frame").style.top = "52px"; ${V}.mark({ ${JSON.stringify(note.key.id)}: 1 })`); await page.drawn();
+    const hit = await ev(`(() => { const e = [...document.querySelectorAll(".vgv-labels > div")].find(x => x.style.display !== "none" && x.style.width); const r = e.getBoundingClientRect(); return ${V}.keyAt(r.left + r.width / 2, r.top + r.height / 2); })()`);
+    same("an overlay laid out lower than the canvas: the ring is still centred on its note", hit && hit.id, note.key.id);
+  }
 } catch (e) { ok(false, "threw: " + (e && e.stack || e)); }
 await page.close(); done();

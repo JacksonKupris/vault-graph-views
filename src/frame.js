@@ -46,6 +46,9 @@ export function makeFrame(el, t) {
     b.addEventListener("click", e => { e.stopPropagation(); run(); });
     return b;
   }
+  // where the canvas's top left is inside this overlay: a host can lay the overlay and the canvas out differently (a toolbar above one),
+  // so a point projected onto the canvas is moved by this before it is drawn here
+  const origin = stage => { const c = stage.canvas.getBoundingClientRect(), o = root.getBoundingClientRect(); return { x: c.left - o.left, y: c.top - o.top }; };
   let pinned = [], info = null, cardOpen = false, lastControls = {}, markText = null;
   // the host's marked notes: a ring on each and one legend item (see rings, mark)
   const ringEls = [];
@@ -79,9 +82,11 @@ export function makeFrame(el, t) {
     // items [{ at, r, n }]: a ring round each point (two rings when n > 1), kept where the point is now
     rings(items, stage) {
       while (ringEls.length < items.length) { const e = make("div", { position: "absolute", left: "0", top: "0", borderRadius: "50%", boxSizing: "border-box", willChange: "transform" }, labelsEl); ringEls.push(e); }
+      const o = origin(stage);
       ringEls.forEach((e, i) => {
         const it = items[i], p = it && project(stage, it.at);
         if (!p) { e.style.display = "none"; return; }
+        p.x += o.x; p.y += o.y;
         const r = Math.max(4, Math.min(24, it.r * p.px)) + 4, d = 2 * r + (it.n > 1 ? 8 : 0);
         css(e, { display: "", width: d + "px", height: d + "px", border: `2px solid ${t.warn}`, boxShadow: it.n > 1 ? `inset 0 0 0 2px transparent, inset 0 0 0 3.5px ${t.warn}` : "none", transform: `translate(${Math.round(p.x - d / 2)}px, ${Math.round(p.y - d / 2)}px)` });
       });
@@ -114,8 +119,10 @@ export function makeFrame(el, t) {
     },
     place(stage) {
       const W = root.clientWidth, H = root.clientHeight, taken = [];
+      const o = origin(stage);
       for (const { l, n, w, h } of pinned) {
         const p = project(stage, l.at);
+        if (p) { p.x += o.x; p.y += o.y; }
         let show = !!p && p.x > -w && p.x < W + w && p.y > -h && p.y < H + h, x = 0, y = 0;
         if (show) {
           // centred on its point (or to its right, side: "right"), kept on the page and clear of the stat line and the buttons
