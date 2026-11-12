@@ -1,5 +1,5 @@
 // What a host imports. README.md has the table.
-//   mountViews(el, { view, data, inputs, onOpen, onAction, theme }) -> { view, resize, update, turn, keyAt, noteAt, pageAt, stat, today, snapshot, api, dispose }
+//   mountViews(el, { view, data, inputs, onOpen, onAction, theme }) -> { view, resize, update, mark, turn, keyAt, noteAt, pageAt, stat, today, snapshot, api, dispose }
 //   view      one of VIEWS' ids (default "bodies")
 //   data      the graph data (contract.js)
 //   inputs    what that view needs beyond the data, and the host's selection (contract.js, checkInputs)

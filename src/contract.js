@@ -17,7 +17,7 @@ export const FOLD_SHAPE = { n: "number", X: "array", stress: "number", grade: "s
 // inputs.scan (Cas9): the Guide scan's result. notes: [{ path, hits }] (hits 0 is a look-alike). ids, when given, is the
 // scan's scope (the notes in its folder or tag); where says that scope in words. No scan yet: leave it out.
 export const SCAN_SHAPE = { guide: "string", where: "string", notes: "array" };
-export const THEME_TOKENS = ["bg", "fg", "muted", "accent", "palette"];
+export const THEME_TOKENS = ["bg", "fg", "muted", "accent", "warn", "palette"];
 
 const typeOf = v => (Array.isArray(v) ? "array" : v === null ? "null" : typeof v);
 const part = (out, label, v, shape) => {
@@ -71,5 +71,5 @@ export function checkInputs(view, data, inputs) {
 const PALETTE = ["#4385BE", "#879A39", "#DA702C", "#8B7EC8", "#3AA99F", "#D14D41", "#D0A215", "#CE5D97",
   "#205EA6", "#66800B", "#BC5215", "#5E409D", "#24837B", "#AF3029", "#AD8301", "#A02F6F"];
 export function theme(t) {
-  return Object.assign({ bg: "#14161a", fg: "#dddddd", muted: "#8a8f98", accent: "#6aa9ff", palette: PALETTE }, t || {});
+  return Object.assign({ bg: "#14161a", fg: "#dddddd", muted: "#8a8f98", accent: "#6aa9ff", warn: "#f59e0b", palette: PALETTE }, t || {});
 }

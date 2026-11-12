@@ -27,6 +27,7 @@ const BREAKS = [
   { what: "a click on a note of the slime mould doesn't reach the host", file: "src/scenes/slime.js", from: "refresh(); invalidate(); onOpen(S.ids[i]); }", to: "refresh(); invalidate(); }", test: "test_slimeview.js" },
   { what: "the mould keeps growing after Hold", file: "src/scenes/slime.js", from: "if (playing && t < T) { const now", to: "if (t < T) { const now", test: "test_slimeview.js" },
   { what: "the Insights button is not added to the controls", file: "src/frame.js", from: 'const buttons = info && at === "bottom" ?', to: 'const buttons = false && at === "bottom" ?', test: "test_explain.js" },
+  { what: "a marked note gets no ring", file: "src/run.js", from: 'k.key.kind === "note" && marks.has(k.key.id)', to: "false", test: "test_marks.js" },
   { what: "a link count in an insight is wrong", file: "src/insights.js", from: 'It is held by ${plural(deg[sagging], "link")}', to: 'It is held by ${plural(deg[sagging] + 1, "link")}', test: "test_insights.js" },
 ];
 
