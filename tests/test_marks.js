@@ -7,7 +7,7 @@ const NAME = "marks", { ok, same, done } = checks(NAME);
 const page = await openDev();
 if (!page) { done(); skip(NAME); }
 const { ev } = page, V = "window.__views";
-const rings = () => ev(`[...document.querySelectorAll(".vgv-labels > div")].filter(e => e.style.display !== "none" && e.style.border).length`);
+const rings = () => ev(`[...document.querySelectorAll(".vgv-rings > div")].filter(e => e.style.display !== "none" && e.style.border).length`);
 const legend = () => ev(`[...document.querySelectorAll(".vgv-mark")].map(e => e.textContent)`);
 try {
   for (const view of ["slime", "loadpaths", "modes", "cones", "bodies"]) {
@@ -27,8 +27,17 @@ try {
     await page.drawn();
     const note = (await page.grid(16)).find(p => p.key && p.key.kind === "note");
     await ev(`document.querySelector(".vgv-frame").style.top = "52px"; ${V}.mark({ ${JSON.stringify(note.key.id)}: 1 })`); await page.drawn();
-    const hit = await ev(`(() => { const e = [...document.querySelectorAll(".vgv-labels > div")].find(x => x.style.display !== "none" && x.style.width); const r = e.getBoundingClientRect(); return ${V}.keyAt(r.left + r.width / 2, r.top + r.height / 2); })()`);
+    const hit = await ev(`(() => { const e = [...document.querySelectorAll(".vgv-rings > div")].find(x => x.style.display !== "none" && x.style.width); const r = e.getBoundingClientRect(); return ${V}.keyAt(r.left + r.width / 2, r.top + r.height / 2); })()`);
     same("an overlay laid out lower than the canvas: the ring is still centred on its note", hit && hit.id, note.key.id);
+  }
+  // the animation stopping or restarting rebuilds the labels: the rings must survive it (they were thrown away with the old labels)
+  if (await page.mount("slime") === null) {
+    await page.drawn();
+    const note = (await page.grid(16)).find(p => p.key && p.key.kind === "note");
+    await ev(`${V}.mark({ ${JSON.stringify(note.key.id)}: 1 })`); await page.drawn();
+    same("slime: the marked note is ringed before the labels are rebuilt", await rings(), 1);
+    await ev(`${V}.api.hold(); ${V}.api.setStep(0); ${V}.api.setStep(${V}.api.steps())`); await page.drawn();
+    same("slime: the ring is still there after the labels are rebuilt (animation stopped)", await rings(), 1);
   }
 } catch (e) { ok(false, "threw: " + (e && e.stack || e)); }
 await page.close(); done();

@@ -31,6 +31,9 @@ export function makeFrame(el, t) {
   const chipEl = make("div", { position: "absolute", top: "34px", left: "0", right: "0", display: "none", justifyContent: "center" });
   const labelsEl = make("div", { position: "absolute", inset: "0" });
   labelsEl.className = "vgv-labels";
+  // the rings have their own layer: labels() rebuilds labelsEl, and rings kept in it were thrown away with the old labels
+  const ringsEl = make("div", { position: "absolute", inset: "0", pointerEvents: "none" });
+  ringsEl.className = "vgv-rings";
   const controlsEl = make("div", { position: "absolute", left: "0", right: "0", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "0 12px" });
   controlsEl.className = "vgv-controls";
   const tipEl = make("div", { position: "absolute", display: "none", maxWidth: "260px", padding: "4px 8px", borderRadius: "6px", background: t.bg, border: `1px solid ${t.muted}`, color: t.fg, fontSize: "12px" });
@@ -81,7 +84,7 @@ export function makeFrame(el, t) {
     mark(text) { markText = text || null; markLegend(); },
     // items [{ at, r, n }]: a ring round each point (two rings when n > 1), kept where the point is now
     rings(items, stage) {
-      while (ringEls.length < items.length) { const e = make("div", { position: "absolute", left: "0", top: "0", borderRadius: "50%", boxSizing: "border-box", willChange: "transform" }, labelsEl); ringEls.push(e); }
+      while (ringEls.length < items.length) { const e = make("div", { position: "absolute", left: "0", top: "0", borderRadius: "50%", boxSizing: "border-box", willChange: "transform" }, ringsEl); ringEls.push(e); }
       const o = origin(stage);
       ringEls.forEach((e, i) => {
         const it = items[i], p = it && project(stage, it.at);
