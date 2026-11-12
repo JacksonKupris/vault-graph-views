@@ -17,6 +17,7 @@ Two hosts load the same build:
 | `loadpaths` | Load paths | The vault as a truss: notes are joints, written links are bars, open tasks are weight, the most important notes are ground. Thick bars carry the most; blue is pulled, red is pushed. | (the selection) | `graph`: open the graph |
 | `modes` | Normal modes | The vault as a drum skin: notes are masses on a sheet, written links are springs, and the sheet rings in the shapes the links allow. Amber swings up, blue down, the dark line between is still. Mode 1 is the cleanest cut into two halves; the arrows step through faster modes. | none | `graph` (when too few notes are joined) |
 | `slime` | Slime mould | The written links as tubes a slime mould grows between the most important notes: tubes thicken where flow between the hubs is high and thin where it is not, leaving the backbone. Press Play to watch it grow. | (the selection) | `graph` |
+| `cyberpunk` | Cyberpunk | A night city: each topic is a district and each note a tower. Height is how much the vault leans on the note, lit windows are recent activity, dark towers are stale, pink beacons are open tasks, and notes in no topic are stalls on the street. Pick a tower to arc its links. | (the selection) | `graph` |
 
 `VaultGraphViews.VIEWS` lists them (`id`, `name`, `hint`, `actions`).
 
@@ -55,8 +56,8 @@ The plugin owns the data shape. `fixtures/sample-graph.json` is a copy of the pl
 | `src/run.js` | Runs a scene: mounts it on the stage, wires turning, picking, the frame and the host's handle. Every view goes through it. |
 | `src/stage.js` | The one stage every scene draws on: renderer, camera, lights, fog, sizing, teardown. A scene never makes its own renderer. |
 | `src/orbit.js`, `src/pick.js` | Turning and zooming by mouse or finger; what is under a point. |
-| `src/frame.js`, `src/insights.js`, `src/text.js`, `src/notes.js` | The stat line, legend, Insights card, controls, labels and tooltip over the canvas; what each maths view says about the notes; wording helpers; which notes are the vault's own writing. |
-| `src/scenes/` | One file a view: `bodies.js`, `cas9.js`, `genome.js`, `cones.js`, `loadpaths.js` (its maths is `src/truss.js`), `slime.js` (its maths is `src/physarum.js`), `modes.js` (its maths is `src/modes.js`; `src/network.js` is the link network both share). |
+| `src/frame.js`, `src/insights.js`, `src/text.js`, `src/notes.js` (with `activityOf` and `staleOf`) | The stat line, legend, Insights card, controls, labels and tooltip over the canvas; what each maths view says about the notes; wording helpers; which notes are the vault's own writing. |
+| `src/scenes/` | One file a view: `bodies.js`, `cas9.js`, `genome.js`, `cones.js`, `loadpaths.js` (its maths is `src/truss.js`), `slime.js` (its maths is `src/physarum.js`), `cyberpunk.js` (its districts and grid helpers are `src/districts.js`), `modes.js` (its maths is `src/modes.js`; `src/network.js` is the link network both share). |
 | `src/models/` | `cas9.js` (the Cas9 model's numbers and where each note sits) and `cas9-model.js` (the packed atoms, written by `scripts/cas9_model.cjs`). |
 | `src/bench.js`, `bench/bench.js` | The phone benchmark and its page. |
 | `dev/dev.js` | The dev page's host code. |
