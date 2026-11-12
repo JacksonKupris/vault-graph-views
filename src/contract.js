@@ -12,6 +12,7 @@ export const DATA_SHAPE = {
   // the journals as one strand (Genome fold): a day each, the notes each day names as indexes into ids
   strand: { days: "array", paths: "array", ids: "array", rows: "array" },
 };
+// Optional on a node: taskAge, the days its oldest open task has waited (Radar; the note's age when absent).
 // inputs.fold (Genome fold): the plugin's VGScience.genomeFold(data.strand.rows), with its grade. X is a point a day.
 export const FOLD_SHAPE = { n: "number", X: "array", stress: "number", grade: "string", domains: "array", loops: "array" };
 // inputs.scan (Cas9): the Guide scan's result. notes: [{ path, hits }] (hits 0 is a look-alike). ids, when given, is the
