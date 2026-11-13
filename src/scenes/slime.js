@@ -1,6 +1,7 @@
 // Slime mould network: tubes between notes grow thick where flow between the hubs is high and thin where it is not, leaving the
 // efficient backbone of the written links (the Physarum solver). Press Play to watch it grow from tubes of equal width.
 //   data.nodes[] the rest as importance needs · data.links the written links (kind "link")
+//   inputs.declined [{ from, to }] links the person has declined, kept by the host so they stay gone ·
 //   inputs.selected the host's selected note · onOpen(id) a note · onAction("graph")
 //   Simulate: onAction("add-link", { from, to }) and onAction("decline-link", { from, to }), note ids; nothing is written by the view
 // The maths is physarum.js; this only draws it.
@@ -88,7 +89,8 @@ export const slime = {
     const I = slimeInsights({ n, bars: S.bars, kept: S.kept, hubs: S.hubs, order: S.ids.map((_, i) => i) }, name);
     // Simulate: the greedy loop (simulate.js) on this view's own notes. Each row is one link, tested against random links; it leaves
     // the list when it is added or declined, so the card moves on to the next. The view never writes: the host adds the link.
-    let sim = null; const gone = new Set();
+    let sim = null; const gone = new Set(), kept = () => { gone.clear(); for (const d of inputs.declined || []) gone.add(d.from + ">" + d.to); };
+    kept();
     const rowsFor = () => (sim ? sim.rows.filter(r => !gone.has(r.from + ">" + r.to)) : []);
     const simRow = r => {
       const k = r.from + ">" + r.to, ij = [at.get(r.from), at.get(r.to)], one = `about 1 in ${Math.max(2, Math.round(1 / r.p))}`;
@@ -99,7 +101,7 @@ export const slime = {
     function runSim() {
       const r = simulate(n, S.bars, S.hubs, { steps: 5, max: 200, shuffles: 50, seed: 1 });
       let before = r.before; const rows = r.added.map(a => { const row = { from: S.ids[a.link[0]], to: S.ids[a.link[1]], p: a.p, pct: before > 0 ? a.gain / before : 0 }; before -= a.gain; return row; });
-      sim = { rows }; gone.clear(); explain(); frame.card(true);
+      sim = { rows }; kept(); explain(); frame.card(true);
     }
     function explain() {
       const rows = rowsFor(), head = sim && !rows.length ? [{ text: sim.rows.length ? "No more links to test." : "No link does better than a random one would. Your hubs already reach each other about as well as links can.", label: "Show it", run: () => { selected = null; t = T; playing = false; refresh(); invalidate(); } }] : [];
@@ -112,7 +114,7 @@ export const slime = {
       targets,
       click(key) { if (key.kind === "note") open(at.get(key.id)); },
       hover(key) { const h = key && key.kind === "note" ? at.get(key.id) : null; if (h !== hovered) { hovered = h; refresh(); } },
-      update(next) { if ("selected" in next) { selected = next.selected && at.has(next.selected) ? at.get(next.selected) : null; refresh(); } },
+      update(next) { if ("declined" in next) { inputs = { ...inputs, declined: next.declined }; if (sim) { kept(); explain(); } } if ("selected" in next) { selected = next.selected && at.has(next.selected) ? at.get(next.selected) : null; refresh(); } },
       frame() {
         if (playing && t < T) { const now = performance.now(); if (last != null) t = Math.min(T, t + ((now - last) / 1000) * FRAMES_PER_SECOND); last = now; if (t >= T) { playing = false; refresh(); } else { current = widths(); shape(); frame.stat(stat()); } invalidate(); } else last = null;
       },

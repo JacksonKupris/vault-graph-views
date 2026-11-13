@@ -82,7 +82,19 @@ try {
     same("Decline tells the host which link", await ev("[window.__actions.slice(), Object.keys(window.__actionDetail || {})]"), [["decline-link"], ["from", "to"]]);
     const left = await rows();
     ok(left.length === found.length - 1 || (found.length === 1 && /^No more links/.test(left[0].text)), `the declined row is gone and the next is first (${left.length} left)`);
-    if (left.length && left[0].buttons[0] === "Add link") {
+    // the host keeps what was declined and hands it back (inputs.declined): after a reload the row stays gone
+    const dec = await ev("window.__actionDetail");
+    same("the host is told which link", Object.keys(dec).sort(), ["from", "to"]);
+    await page.mount("slime", { declined: [dec] });
+    await page.press("Find links that would shorten the routes between your hubs, and test each against random links");
+    const again = await rows();
+    ok(again.length === left.length && again.every((r, i) => r.text === left[i].text), `a declined link stays gone when the view is mounted again (${again.length} rows)`);
+    await ev(`window.__views.update({ declined: [] })`);
+    ok((await rows()).length === found.length, "and comes back when the host forgets it");
+    await page.mount("slime");
+    await page.press("Find links that would shorten the routes between your hubs, and test each against random links");
+    const left2 = await rows();
+    if (left2.length && left2[0].buttons[0] === "Add link") {
       await ev("window.__actions.length = 0");
       await ev(`[...document.querySelectorAll(".vgv-insights button")].find(b => b.textContent === "Add link").click()`);
       same("Add link tells the host", await ev("[window.__actions.slice(), Object.keys(window.__actionDetail || {})]"), [["add-link"], ["from", "to"]]);
