@@ -37,6 +37,8 @@ const BREAKS = [
   { what: "a link to itself is tested", file: "src/simulate.js", from: "if (link[0] === link[1] || taken.has", to: "if (taken.has", test: "test_simulate.js" },
   { what: "the greedy loop doesn't add the chosen link before looking again", file: "src/simulate.js", from: "cur = [...cur, best.link]; out.push(best);", to: "out.push(best);", test: "test_simulate.js" },
   { what: "the sample of candidate links ignores the seed", file: "src/simulate.js", from: "const rand = rng(seed);", to: "const rand = rng(Math.random() * 1e9);", test: "test_simulate.js" },
+  { what: "the fast scorer drops the update for the extra link", file: "src/simulate.js", from: "return R(a, b) - (d * d) / (1 + r);", to: "return R(a, b);", test: "test_simulate.js" },
+  { what: "the fast scorer takes a vault in two pieces as one", file: "src/simulate.js", from: "new Set(component(n, bars)).size !== 1) return null;", to: "false) return null;", test: "test_simulate.js" },
 ];
 
 const only = process.argv[2];
