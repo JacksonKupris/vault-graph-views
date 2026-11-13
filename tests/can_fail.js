@@ -39,6 +39,8 @@ const BREAKS = [
   { what: "the sample of candidate links ignores the seed", file: "src/simulate.js", from: "const rand = rng(seed);", to: "const rand = rng(Math.random() * 1e9);", test: "test_simulate.js" },
   { what: "the fast scorer drops the update for the extra link", file: "src/simulate.js", from: "return R(a, b) - (d * d) / (1 + r);", to: "return R(a, b);", test: "test_simulate.js" },
   { what: "the fast scorer takes a vault in two pieces as one", file: "src/simulate.js", from: "new Set(component(n, bars)).size !== 1) return null;", to: "false) return null;", test: "test_simulate.js" },
+  { what: "Add link doesn't tell the host", file: "src/scenes/slime.js", from: 'explain(); onAction("add-link", { from: r.from, to: r.to }); }', to: "explain(); }", test: "test_slimeview.js" },
+  { what: "a declined link stays in the list", file: "src/scenes/slime.js", from: 'run: () => { gone.add(k); explain(); onAction("decline-link"', to: 'run: () => { explain(); onAction("decline-link"', test: "test_slimeview.js" },
 ];
 
 const only = process.argv[2];

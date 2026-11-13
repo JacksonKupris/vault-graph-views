@@ -2,18 +2,20 @@
 // efficient backbone of the written links (the Physarum solver). Press Play to watch it grow from tubes of equal width.
 //   data.nodes[] the rest as importance needs · data.links the written links (kind "link")
 //   inputs.selected the host's selected note · onOpen(id) a note · onAction("graph")
+//   Simulate: onAction("add-link", { from, to }) and onAction("decline-link", { from, to }), note ids; nothing is written by the view
 // The maths is physarum.js; this only draws it.
 import { InstancedMesh, SphereGeometry, CylinderGeometry, MeshStandardMaterial, Matrix4, Color, Vector3, Quaternion } from "three";
 import { slimeInsights } from "../insights.js";
 import { plural, clip } from "../text.js";
 import { vaultSlime } from "../physarum.js";
+import { simulate } from "../simulate.js";
 
 export const FRAMES_PER_SECOND = 8, CARRY = 0.1;
 
 export const slime = {
   id: "slime", name: "Slime mould", hint: "Which written links carry the vault, and which fade away",
   home: { yaw: 0.6, pitch: 0.75, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100] },
-  actions: ["graph"],
+  actions: ["graph", "add-link", "decline-link"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const S = vaultSlime(data.nodes, data.links, { max: 80 }), n = S.ids.length, T = S.frames.length - 1;
     if (n < 3 || S.hubs.length < 2) {
@@ -53,6 +55,7 @@ export const slime = {
         { label: playing && !done ? "Hold" : done ? "Grow again" : "Play", title: playing && !done ? "Hold the growth" : done ? "Start again from tubes of equal width" : "Let the mould grow", run: () => { if (t >= T) t = 0; playing = !(playing && !done); last = null; refresh(); invalidate(); } },
         { label: "Start", title: "Back to tubes of equal width", off: t === 0, run: () => { t = 0; playing = false; last = null; refresh(); invalidate(); } },
         { label: "End", title: "Jump to the finished backbone", off: t >= T, run: () => { t = T; playing = false; refresh(); invalidate(); } },
+        { label: "Simulate", title: "Find links that would shorten the routes between your hubs, and test each against random links", run: runSim },
       ] });
     }
     function labels() {
@@ -83,8 +86,27 @@ export const slime = {
     function open(i) { selected = i; refresh(); invalidate(); onOpen(S.ids[i]); }
     const targets = () => S.ids.map((id, i) => { return { at: lift(i), r: size(i) * 1.3, key: { kind: "note", id, tip: `${name(i)}${hub.has(i) ? " · hub" : ""}` } }; });
     const I = slimeInsights({ n, bars: S.bars, kept: S.kept, hubs: S.hubs, order: S.ids.map((_, i) => i) }, name);
-    frame.explain({ plain: I.plain, about: I.about, legend: [{ color: "#f59e0b", text: "carries flow (higher = more)" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }],
-      insights: I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; t = T; playing = false; refresh(); invalidate(); } } })) });
+    // Simulate: the greedy loop (simulate.js) on this view's own notes. Each row is one link, tested against random links; it leaves
+    // the list when it is added or declined, so the card moves on to the next. The view never writes: the host adds the link.
+    let sim = null; const gone = new Set();
+    const rowsFor = () => (sim ? sim.rows.filter(r => !gone.has(r.from + ">" + r.to)) : []);
+    const simRow = r => {
+      const k = r.from + ">" + r.to, ij = [at.get(r.from), at.get(r.to)], one = `about 1 in ${Math.max(2, Math.round(1 / r.p))}`;
+      return { text: `Link ${name(ij[0])} to ${name(ij[1])}: routes between your hubs get ${Math.max(1, Math.round(r.pct * 100))}% shorter. A random link would do this ${one} times.`, label: "Add link", title: `Add a link between ${name(ij[0])} and ${name(ij[1])}`,
+        run: () => { gone.add(k); explain(); onAction("add-link", { from: r.from, to: r.to }); },
+        extra: [{ label: "Decline", title: "Skip this link", run: () => { gone.add(k); explain(); onAction("decline-link", { from: r.from, to: r.to }); } }, { label: "Show", title: `Show ${name(ij[0])}`, run: () => open(ij[0]) }] };
+    };
+    function runSim() {
+      const r = simulate(n, S.bars, S.hubs, { steps: 5, max: 200, shuffles: 50, seed: 1 });
+      let before = r.before; const rows = r.added.map(a => { const row = { from: S.ids[a.link[0]], to: S.ids[a.link[1]], p: a.p, pct: before > 0 ? a.gain / before : 0 }; before -= a.gain; return row; });
+      sim = { rows }; gone.clear(); explain(); frame.card(true);
+    }
+    function explain() {
+      const rows = rowsFor(), head = sim && !rows.length ? [{ text: sim.rows.length ? "No more links to test." : "No link does better than a random one would. Your hubs already reach each other about as well as links can.", label: "Show it", run: () => { selected = null; t = T; playing = false; refresh(); invalidate(); } }] : [];
+      frame.explain({ plain: I.plain, about: I.about, legend: LEGEND, insights: [...rows.map(simRow), ...head, ...I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; t = T; playing = false; refresh(); invalidate(); } } }))] });
+    }
+    const LEGEND = [{ color: "#f59e0b", text: "carries flow (higher = more)" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }];
+    explain();
     refresh();
     return {
       targets,
