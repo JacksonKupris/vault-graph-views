@@ -49,6 +49,20 @@ ok(simulate(6, full, [0, 5]).added.length === 0 && candidates(6, full).length ==
 { const c = candidates(6, [[0, 1]], { skip: [0, 5] }), s = simulate(N, path, hubs, { steps: 3, shuffles: 49, seed: 2, skip: [10] });
   ok(c.length === 6 && c.every(([i, j]) => i !== 0 && j !== 0 && i !== 5 && j !== 5), `skipped nodes are in no candidate (${c.length} candidates)`);
   ok(sim.added.some(x => x.link.includes(10)) && s.added.length >= 2 && s.added.every(x => !x.link.includes(10)), `the loop leaves a skipped node out of the links it adds (${JSON.stringify(s.added.map(x => x.link))})`); }
+// Fed at hubs: five hubs in a row. The end hubs list one note each (5 and 6), the three in the middle list four each, and one link
+// joins each group to the next. Linking note 5 to note 6 closes the row: the one clear win between two notes. A random link that
+// ends at a hub gains more than any link between two notes, so the rivals must leave hubs out too (the candidates already do):
+// drawn from every pair, they hid every win in a vault fed at its hubs (0 links offered on the sample).
+{ const H = [0, 1, 2, 3, 4], row = [[0, 5], [4, 6]]; for (let h = 1; h <= 3; h++) for (let k = 0; k < 4; k++) row.push([h, 7 + (h - 1) * 4 + k]);
+  row.push([5, 7], [8, 11], [12, 15], [16, 6]);
+  const n = 19, far = [5, 6], t = testAdd(n, row, H, far, { shuffles: 199, seed: 3, skip: H }), open = testAdd(n, row, H, far, { shuffles: 199, seed: 3 });
+  ok(t.valid && t.p < 0.05, `closing a row of hubs with a link between two notes is a win (gain ${t.gain.toFixed(3)}, p ${t.p.toFixed(3)})`);
+  ok(open.p > t.p, `against rivals that may end at a hub the same link looks worse (p ${open.p.toFixed(3)} against ${t.p.toFixed(3)})`);
+  ok(!testAdd(n, row, H, [0, 12], { skip: H }).valid, "a link that ends at a skipped node is not tested");
+  const rr2 = rng(9), tk2 = new Set(row.map(([i, j]) => (i < j ? i + "," + j : j + "," + i)));
+  ok(Array.from({ length: 300 }, () => randomNonEdge(n, tk2, rr2, new Set(H))).every(([i, j]) => i > 4 && j > 4), "a rival never ends at a skipped node");
+  const sim2 = simulate(n, row, H, { steps: 3, shuffles: 99, seed: 1, skip: H });
+  ok(sim2.added.length >= 1 && sim2.added[0].link.join("-") === "5-6" && sim2.added.every(x => x.link.every(i => i > 4)) && sim2.after < sim2.before, `fed at hubs, the loop offers the closing link first (${JSON.stringify(sim2.added.map(x => x.link))})`); }
 ok(candidates(40, path.slice(0, 3), { max: 50, seed: 4 }).length === 50 && JSON.stringify(candidates(40, [], { max: 50, seed: 4 })) === JSON.stringify(candidates(40, [], { max: 50, seed: 4 })), "a large vault is sampled the same way each time");
 
 // The fast scorer gives the same number as solving the whole vault again, for the vault as it is and for each extra link
