@@ -2,7 +2,7 @@
 // and a run with the same seed gives the same answer.
 //   node tests/test_simulate.js
 import { checks } from "./kit.js";
-import { rng, score, testAdd, rank, randomNonEdge, candidates, simulate } from "../src/simulate.js";
+import { rng, score, scorer, testAdd, rank, randomNonEdge, candidates, simulate } from "../src/simulate.js";
 
 const { ok, done } = checks("simulate");
 const near = (a, b, t = 1e-6) => Math.abs(a - b) <= t;
@@ -46,4 +46,18 @@ ok(sim.added.every(a => a.link[0] !== a.link[1]) && new Set(sim.added.map(a => a
 const full = []; for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) full.push([i, j]);
 ok(simulate(6, full, [0, 5]).added.length === 0 && candidates(6, full).length === 0, "nothing is added when every link exists");
 ok(candidates(40, path.slice(0, 3), { max: 50, seed: 4 }).length === 50 && JSON.stringify(candidates(40, [], { max: 50, seed: 4 })) === JSON.stringify(candidates(40, [], { max: 50, seed: 4 })), "a large vault is sampled the same way each time");
+
+// The fast scorer gives the same number as solving the whole vault again, for the vault as it is and for each extra link
+{
+  let worst = 0, r = rng(77);
+  for (let t = 0; t < 12; t++) {
+    const n = 8 + t, bars = [], seen = new Set();
+    for (let i = 1; i < n; i++) { const j = Math.floor(r() * i); bars.push([j, i]); seen.add(j + "," + i); }
+    for (let k = 0; k < 4; k++) { const e = randomNonEdge(n, seen, r); bars.push(e); seen.add(e[0] < e[1] ? e.join() : e[1] + "," + e[0]); }
+    const hs = [0, 2, 3, n - 1], sc = scorer(n, bars, hs), link = randomNonEdge(n, seen, r);
+    worst = Math.max(worst, Math.abs(sc.base - score(n, bars, hs)), Math.abs(sc.after(link) - score(n, [...bars, link], hs)));
+  }
+  ok(worst < 1e-6, `the fast scorer matches a full solve (worst gap ${worst.toExponential(1)})`);
+  ok(scorer(4, [[0, 1], [2, 3]], [0, 3]) === null, "a vault in two pieces is left to the full solve");
+}
 done();
