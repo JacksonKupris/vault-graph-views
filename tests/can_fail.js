@@ -30,6 +30,7 @@ const BREAKS = [
   { what: "a marked note gets no ring", file: "src/run.js", from: 'k.key.kind === "note" && marks.has(k.key.id)', to: "false", test: "test_marks.js" },
   { what: "a link count in an insight is wrong", file: "src/insights.js", from: 'It is held by ${plural(deg[sagging], "link")}', to: 'It is held by ${plural(deg[sagging] + 1, "link")}', test: "test_insights.js" },
   { what: "a click on a ring of the Heat clock doesn't pick its topic", file: "src/scenes/clock.js", from: `click(k) { if (k.kind === "ring") pick(k.id); }`, to: "click(k) {}", test: "test_clock.js" },
+  { what: "a declined link comes back when the view is mounted again", file: "src/scenes/slime.js", from: "for (const d of inputs.declined || [])", to: "for (const d of [])", test: "test_slimeview.js" },
   { what: "the Food web calls a note endangered however few notes rest on it", file: "src/scenes/foodweb.js", from: "reliedOn >= RELIED && stale(n)", to: "reliedOn >= 0 && stale(n)", test: "test_foodweb.js" },
   { what: "the Heat clock counts a ring's heat against all topics, not its own busiest slot", file: "src/scenes/clock.js", from: "const v = r[d.key][s], t = v / mx;", to: "const v = r[d.key][s], t = v / 99;", test: "test_clock.js" },
   { what: "a hub pair with no route is scored as if it were reachable", file: "src/simulate.js", from: "comp[hubs[a]] !== comp[hubs[b]] ? n :", to: "false ? n :", test: "test_simulate.js" },
