@@ -1,6 +1,6 @@
 {
   "name": "vault-graph-views",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "description": "The graphs for Vault Graph: one renderer and every graph, loaded by the Obsidian plugin or run on a standalone page.",
   "type": "module",
