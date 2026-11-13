@@ -1,5 +1,5 @@
 // The dev page: what a host does, in the least code. /dev.html?view=bodies|cas9|genome|cones|loadpaths|modes|slime&guide=text
-// window.__DATA is the sample graph and window.__FOLD the sample fold (build.js puts both in the page).
+// window.__DATA is the sample graph and window.__FOLD the sample fold, window.__WEB the sample Food web (build.js puts them in the page).
 // For the tests: window.__views (the mounted view), __opened, __actions, __error, and __mount(view, inputs, data) to mount again.
 (() => {
   const V = VaultGraphViews, host = document.getElementById("host"), q = new URLSearchParams(location.search);
@@ -23,7 +23,7 @@
     try {
       window.__views = V.mountViews(host, {
         view, data: data || window.__DATA,
-        inputs: inputs || (view === "genome" ? { fold: window.__FOLD } : view === "cas9" ? { scan: scanFor(q.get("guide")) } : {}),
+        inputs: inputs || (view === "genome" ? { fold: window.__FOLD } : view === "foodweb" ? { web: window.__WEB } : view === "cas9" ? { scan: scanFor(q.get("guide")) } : {}),
         onOpen(id) { window.__opened = id; said.textContent = "Open: " + id; },
         onAction(name, detail) { window.__actions.push(name); window.__actionDetail = detail || null; said.textContent = "Action: " + name; },
       });
