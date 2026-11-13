@@ -2,7 +2,7 @@
 // and a run with the same seed gives the same answer.
 //   node tests/test_simulate.js
 import { checks } from "./kit.js";
-import { rng, score, testAdd, rank, randomNonEdge } from "../src/simulate.js";
+import { rng, score, testAdd, rank, randomNonEdge, candidates, simulate } from "../src/simulate.js";
 
 const { ok, done } = checks("simulate");
 const near = (a, b, t = 1e-6) => Math.abs(a - b) <= t;
@@ -37,4 +37,13 @@ ok(a.p === b.p && a.gain === b.gain, "the same seed gives the same result");
 ok(!testAdd(N, path, hubs, [3, 3]).valid && !testAdd(N, path, hubs, [4, 3]).valid, "a link to itself or one that exists is not tested");
 const tk = new Set(path.map(([i, j]) => i + "," + j)), rr = rng(3);
 ok(Array.from({ length: 200 }, () => randomNonEdge(N, tk, rr)).every(([i, j]) => i !== j && !tk.has(i < j ? i + "," + j : j + "," + i)), "the null model never draws a self link or an existing link");
+
+// The greedy loop: on a path it closes the ends first and the score drops; the same seed repeats; on a complete graph it stops with nothing
+const sim = simulate(N, path, hubs, { steps: 3, shuffles: 49, seed: 2 });
+ok(sim.added.length >= 1 && sim.added[0].link.join("-") === "0-11" && sim.after < sim.before, `the loop closes the long path first (${sim.before.toFixed(2)} to ${sim.after.toFixed(2)})`);
+ok(JSON.stringify(simulate(N, path, hubs, { steps: 3, shuffles: 49, seed: 2 })) === JSON.stringify(sim), "the loop repeats exactly with the same seed");
+ok(sim.added.every(a => a.link[0] !== a.link[1]) && new Set(sim.added.map(a => a.link.join())).size === sim.added.length, "the loop never adds a self link or the same link twice");
+const full = []; for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) full.push([i, j]);
+ok(simulate(6, full, [0, 5]).added.length === 0 && candidates(6, full).length === 0, "nothing is added when every link exists");
+ok(candidates(40, path.slice(0, 3), { max: 50, seed: 4 }).length === 50 && JSON.stringify(candidates(40, [], { max: 50, seed: 4 })) === JSON.stringify(candidates(40, [], { max: 50, seed: 4 })), "a large vault is sampled the same way each time");
 done();

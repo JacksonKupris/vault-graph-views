@@ -35,6 +35,8 @@ const BREAKS = [
   { what: "the link under test counts as its own rival in the null model", file: "src/simulate.js", from: "others.add(key(link[0], link[1]));", to: "", test: "test_simulate.js" },
   { what: "the null model may draw a link that already exists", file: "src/simulate.js", from: "i !== j && !taken.has(key(i, j))) return [i, j]; }", to: "i !== j) return [i, j]; }", test: "test_simulate.js" },
   { what: "a link to itself is tested", file: "src/simulate.js", from: "if (link[0] === link[1] || taken.has", to: "if (taken.has", test: "test_simulate.js" },
+  { what: "the greedy loop doesn't add the chosen link before looking again", file: "src/simulate.js", from: "cur = [...cur, best.link]; out.push(best);", to: "out.push(best);", test: "test_simulate.js" },
+  { what: "the sample of candidate links ignores the seed", file: "src/simulate.js", from: "const rand = rng(seed);", to: "const rand = rng(Math.random() * 1e9);", test: "test_simulate.js" },
 ];
 
 const only = process.argv[2];
