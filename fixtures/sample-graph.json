@@ -3208,6 +3208,24 @@
    "target": "03-Resources/Infrastructure/VPN Setup.md",
    "w": 1,
    "kind": "moc"
+  },
+  {
+   "source": "02-Projects/Warehouse/Warehouse MOC.md",
+   "target": "02-Projects/Rental App/User Stories/Scope of Work — WH_ScannerUpgrade.md",
+   "w": 1,
+   "kind": "moc"
+  },
+  {
+   "source": "02-Projects/Warehouse/Warehouse MOC.md",
+   "target": "02-Projects/Fleet/Parts Inventory.md",
+   "w": 1,
+   "kind": "moc"
+  },
+  {
+   "source": "03-Resources/Infrastructure/Infrastructure MOC.md",
+   "target": "02-Projects/Rental App/User Stories/Scope of Work — RA_Deposits.md",
+   "w": 1,
+   "kind": "moc"
   }
  ],
  "mocs": [

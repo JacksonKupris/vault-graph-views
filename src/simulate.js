@@ -81,10 +81,11 @@ export function rank(n, bars, hubs, candidates, { shuffles = 50, seed = 1, alpha
     .filter(r => r.valid && r.p < alpha && r.gain >= minGain).sort((a, b) => b.gain - a.gain || a.p - b.p);
 }
 
-// Candidate links to try: every unlinked pair, or a seeded sample of `max` of them when there are more.
-export function candidates(n, bars, { max = 200, seed = 1 } = {}) {
-  const taken = new Set(bars.map(([i, j]) => key(i, j))), all = [];
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (!taken.has(key(i, j))) all.push([i, j]);
+// Candidate links to try: every unlinked pair, or a seeded sample of `max` of them when there are more. Nodes in `skip`
+// (generated notes, such as hubs, that a person does not link by hand) are never an end of a candidate.
+export function candidates(n, bars, { max = 200, seed = 1, skip = null } = {}) {
+  const taken = new Set(bars.map(([i, j]) => key(i, j))), all = [], out = new Set(skip || []);
+  for (let i = 0; i < n; i++) if (!out.has(i)) for (let j = i + 1; j < n; j++) if (!out.has(j) && !taken.has(key(i, j))) all.push([i, j]);
   if (all.length <= max) return all;
   const rand = rng(seed);
   for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
@@ -93,10 +94,10 @@ export function candidates(n, bars, { max = 200, seed = 1 } = {}) {
 
 // The greedy loop: take the best link that beats the null model, add it, and look again, up to `steps` links.
 // It stops early when nothing left beats the null model (the honest answer is then "no more links help").
-export function simulate(n, bars, hubs, { steps = 5, max = 200, shuffles = 50, seed = 1, alpha = 0.05, minGain = 1e-3 } = {}) {
+export function simulate(n, bars, hubs, { steps = 5, max = 200, shuffles = 50, seed = 1, alpha = 0.05, minGain = 1e-3, skip = null } = {}) {
   let cur = bars.map(([i, j]) => [i, j]); const out = [], start = score(n, cur, hubs);
   for (let s = 0; s < steps; s++) {
-    const best = rank(n, cur, hubs, candidates(n, cur, { max, seed: seed + s }), { shuffles, seed: seed + s, alpha, minGain })[0];
+    const best = rank(n, cur, hubs, candidates(n, cur, { max, seed: seed + s, skip }), { shuffles, seed: seed + s, alpha, minGain })[0];
     if (!best) break;
     cur = [...cur, best.link]; out.push(best);
   }

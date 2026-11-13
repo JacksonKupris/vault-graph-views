@@ -26,6 +26,7 @@ export const slime = {
       return { targets: () => [], click() {}, update() {}, stat, today: () => null, api: { empty: true } };
     }
     const byId = new Map(data.nodes.map(x => [x.id, x])), name = i => byId.get(S.ids[i]).name, at = new Map(S.ids.map((id, i) => [id, i]));
+    const FOOD = S.fed === "hubs" ? "hubs" : "most linked notes";   // what the mould is fed at, in words
     const hub = new Set(S.hubs), peak = Math.max(...S.D, 1e-12), add = o => { stage.scene.add(o); return o; };
     const xs = S.pos.map(p => p[0]), zs = S.pos.map(p => p[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
     // the layout is drawn at one size whatever the vault's: its farthest note sits RADIUS from the middle, so it fits the first view
@@ -48,15 +49,15 @@ export const slime = {
     const stat = () => {
       const f = hovered != null ? hovered : selected;
       if (f != null) { const own = S.bars.map((b, e) => (b[0] === f || b[1] === f ? e : -1)).filter(e => e >= 0), keep = own.filter(e => current[e] / peak >= CARRY).length; return `${name(f)} · ${hub.has(f) ? "hub · " : ""}${keep} of ${plural(own.length, "link")} carry on`; }
-      return `${carrying(current)} of ${plural(S.bars.length, "link")} carry on · fed by ${S.hubs.length} hubs · step ${Math.round(t)} of ${T}`;
+      return `${carrying(current)} of ${plural(S.bars.length, "link")} carry on · fed by ${S.hubs.length} ${FOOD} · step ${Math.round(t)} of ${T}`;
     };
     function controls() {
       const done = t >= T;
-      frame.controls({ lines: [done ? "The links that carry flow between the hubs" : "Tubes thicken where flow is high and thin where it is not"], buttons: [
+      frame.controls({ lines: [done ? `The links that carry flow between the ${FOOD}` : "Tubes thicken where flow is high and thin where it is not"], buttons: [
         { label: playing && !done ? "Hold" : done ? "Grow again" : "Play", title: playing && !done ? "Hold the growth" : done ? "Start again from tubes of equal width" : "Let the mould grow", run: () => { if (t >= T) t = 0; playing = !(playing && !done); last = null; refresh(); invalidate(); } },
         { label: "Start", title: "Back to tubes of equal width", off: t === 0, run: () => { t = 0; playing = false; last = null; refresh(); invalidate(); } },
         { label: "End", title: "Jump to the finished backbone", off: t >= T, run: () => { t = T; playing = false; refresh(); invalidate(); } },
-        { label: "Simulate", title: "Find links that would shorten the routes between your hubs, and test each against random links", run: runSim },
+        { label: "Simulate", title: `Find links that would shorten the routes between your ${FOOD}, and test each against random links`, run: runSim },
       ] });
     }
     function labels() {
@@ -94,17 +95,17 @@ export const slime = {
     const rowsFor = () => (sim ? sim.rows.filter(r => !gone.has(r.from + ">" + r.to)) : []);
     const simRow = r => {
       const k = r.from + ">" + r.to, ij = [at.get(r.from), at.get(r.to)], one = `about 1 in ${Math.max(2, Math.round(1 / r.p))}`;
-      return { text: `Link ${name(ij[0])} to ${name(ij[1])}: routes between your hubs get ${Math.max(1, Math.round(r.pct * 100))}% shorter. A random link would do this ${one} times.`, label: "Add link", title: `Add a link between ${name(ij[0])} and ${name(ij[1])}`,
+      return { text: `Link ${name(ij[0])} to ${name(ij[1])}: routes between your ${FOOD} get ${Math.max(1, Math.round(r.pct * 100))}% shorter. A random link would do this ${one} times.`, label: "Add link", title: `Add a link between ${name(ij[0])} and ${name(ij[1])}`,
         run: () => { gone.add(k); explain(); onAction("add-link", { from: r.from, to: r.to }); },
         extra: [{ label: "Decline", title: "Skip this link", run: () => { gone.add(k); explain(); onAction("decline-link", { from: r.from, to: r.to }); } }, { label: "Show", title: `Show ${name(ij[0])}`, run: () => open(ij[0]) }] };
     };
     function runSim() {
-      const r = simulate(n, S.bars, S.hubs, { steps: 5, max: 200, shuffles: 50, seed: 1 });
+      const r = simulate(n, S.bars, S.hubs, { steps: 5, max: 200, shuffles: 50, seed: 1, skip: S.fed === "hubs" ? S.hubs : null });   // a hub is a generated map: a link is only offered between two notes
       let before = r.before; const rows = r.added.map(a => { const row = { from: S.ids[a.link[0]], to: S.ids[a.link[1]], p: a.p, pct: before > 0 ? a.gain / before : 0 }; before -= a.gain; return row; });
       sim = { rows }; kept(); explain(); frame.card(true);
     }
     function explain() {
-      const rows = rowsFor(), head = sim && !rows.length ? [{ text: sim.rows.length ? "No more links to test." : "No link does better than a random one would. Your hubs already reach each other about as well as links can.", label: "Show it", run: () => { selected = null; t = T; playing = false; refresh(); invalidate(); } }] : [];
+      const rows = rowsFor(), head = sim && !rows.length ? [{ text: sim.rows.length ? "No more links to test." : `No link does better than a random one would. Your ${FOOD} already reach each other about as well as links can.`, label: "Show it", run: () => { selected = null; t = T; playing = false; refresh(); invalidate(); } }] : [];
       frame.explain({ plain: I.plain, about: I.about, legend: LEGEND, insights: [...rows.map(simRow), ...head, ...I.insights.map(it => ({ text: it.text, label: it.label, run: () => { if (it.note != null) open(it.note); else { selected = null; t = T; playing = false; refresh(); invalidate(); } } }))] });
     }
     const LEGEND = [{ color: "#f59e0b", text: "carries flow (higher = more)" }, { color: theme.muted, text: "fading" }, { color: theme.accent || "#38bdf8", text: "hub" }];
@@ -119,7 +120,7 @@ export const slime = {
         if (playing && t < T) { const now = performance.now(); if (last != null) t = Math.min(T, t + ((now - last) / 1000) * FRAMES_PER_SECOND); last = now; if (t >= T) { playing = false; refresh(); } else { current = widths(); shape(); frame.stat(stat()); } invalidate(); } else last = null;
       },
       stat,
-      today: () => ({ text: `${carrying(S.frames[T])} of ${plural(S.bars.length, "link")} carry the vault between its ${S.hubs.length} hubs`, label: "Show it", run: () => { selected = null; t = T; playing = false; refresh(); } }),
+      today: () => ({ text: `${carrying(S.frames[T])} of ${plural(S.bars.length, "link")} carry the vault between its ${S.hubs.length} ${FOOD}`, label: "Show it", run: () => { selected = null; t = T; playing = false; refresh(); } }),
       api: {
         ids: () => S.ids, hubs: () => S.hubs.map(i => S.ids[i]), step: () => t, steps: () => T, playing: () => playing && t < T, widths: () => Array.from(current), final: () => Array.from(S.D),
         setStep(v) { t = Math.max(0, Math.min(T, v)); playing = false; refresh(); invalidate(); }, hold() { playing = false; refresh(); }, selected: () => (selected == null ? null : S.ids[selected]),

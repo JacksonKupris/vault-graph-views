@@ -45,6 +45,10 @@ ok(JSON.stringify(simulate(N, path, hubs, { steps: 3, shuffles: 49, seed: 2 })) 
 ok(sim.added.every(a => a.link[0] !== a.link[1]) && new Set(sim.added.map(a => a.link.join())).size === sim.added.length, "the loop never adds a self link or the same link twice");
 const full = []; for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) full.push([i, j]);
 ok(simulate(6, full, [0, 5]).added.length === 0 && candidates(6, full).length === 0, "nothing is added when every link exists");
+// nodes in `skip` (hubs are generated notes) are never an end of a candidate, nor of a link the loop adds
+{ const c = candidates(6, [[0, 1]], { skip: [0, 5] }), s = simulate(N, path, hubs, { steps: 3, shuffles: 49, seed: 2, skip: [10] });
+  ok(c.length === 6 && c.every(([i, j]) => i !== 0 && j !== 0 && i !== 5 && j !== 5), `skipped nodes are in no candidate (${c.length} candidates)`);
+  ok(sim.added.some(x => x.link.includes(10)) && s.added.length >= 2 && s.added.every(x => !x.link.includes(10)), `the loop leaves a skipped node out of the links it adds (${JSON.stringify(s.added.map(x => x.link))})`); }
 ok(candidates(40, path.slice(0, 3), { max: 50, seed: 4 }).length === 50 && JSON.stringify(candidates(40, [], { max: 50, seed: 4 })) === JSON.stringify(candidates(40, [], { max: 50, seed: 4 })), "a large vault is sampled the same way each time");
 
 // The fast scorer gives the same number as solving the whole vault again, for the vault as it is and for each extra link

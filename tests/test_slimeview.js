@@ -15,6 +15,7 @@ try {
   same("the view says which it is, and what it asks of the host", await ev(`[${V}.view, VaultGraphViews.VIEWS.find(v => v.id === "slime").actions]`), ["slime", ["graph", "add-link", "decline-link"]]);
   const ids = await ev(`${A}.ids()`), hubs = await ev(`${A}.hubs()`), links = await ev(`${A}.links()`);
   ok(ids.length >= 10 && hubs.length >= 2 && links >= ids.length - 1, `notes, hubs and links (${ids.length} notes, ${hubs.length} hubs, ${links} links)`);
+  ok(hubs.length === 4 && hubs.every(h => / MOC\.md$/.test(h)), `the hubs are the sample vault's hub notes in the joined set (${hubs.map(h => h.split("/").pop())})`);
   same("it starts growing", [await ev(`${A}.step()`) < await ev(`${A}.steps()`), await ev(`${A}.playing()`)], [true, true]);
 
   await ev(`${A}.hold()`); await page.drawn();
@@ -74,6 +75,7 @@ try {
   const found = await rows();
   ok(found.length >= 1, `Simulate lists a result (${found.length} rows)`);
   const first = found[0];
+  ok(first.buttons[0] === "Add link" && found.length >= 2, `the sample vault has links worth adding, so Add and Decline are really pressed (${found.length} rows)`);
   ok(first.buttons[0] === "Add link" ? /^Link .+ to .+: routes between your hubs get [0-9]+% shorter[.] A random link would do this about 1 in [0-9]+ times[.]$/.test(first.text) && first.buttons.join() === "Add link,Decline,Show"
      : /^No link does better/.test(first.text), `the row says what it does and offers Add, Decline and Show: ${first.text}`);
   if (first.buttons[0] === "Add link") {
