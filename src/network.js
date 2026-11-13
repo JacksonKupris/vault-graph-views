@@ -4,10 +4,12 @@ import { special, importanceOf, hash } from "./notes.js";
 
 // The vault's own notes that the largest connected set of written links joins, at most `max` of the most important ones,
 // most important first. bars are pairs of indexes into ids; own maps an id to its node; imp scores a node 0 to 1.
-export function joinedNotes(nodes, links, { max = 120 } = {}) {
-  const imp = importanceOf(nodes), own = new Map(nodes.filter(n => !special(n)).map(n => [n.id, n]));
+// With `hubs` (a number), the vault's hub notes (its maps, `moc`) join in with the links to their members, the `hubs`
+// with most members first in `ids`; without it they stay out, as people and ghosts always do.
+export function joinedNotes(nodes, links, { max = 120, hubs = 0 } = {}) {
+  const imp = importanceOf(nodes), own = new Map(nodes.filter(n => !special(n) || (hubs && n.moc)).map(n => [n.id, n])), tube = hubs ? k => k === "link" || k === "moc" : k => k === "link";
   const adj = new Map([...own.keys()].map(id => [id, new Set()]));
-  for (const l of links) if (l.kind === "link" && l.source !== l.target && adj.has(l.source) && adj.has(l.target)) { adj.get(l.source).add(l.target); adj.get(l.target).add(l.source); }
+  for (const l of links) if (tube(l.kind) && l.source !== l.target && adj.has(l.source) && adj.has(l.target)) { adj.get(l.source).add(l.target); adj.get(l.target).add(l.source); }
   const seen = new Set(); let best = [];
   for (const id of [...adj.keys()].sort()) {
     if (seen.has(id) || !adj.get(id).size) continue;
@@ -15,7 +17,9 @@ export function joinedNotes(nodes, links, { max = 120 } = {}) {
     for (let i = 0; i < comp.length; i++) for (const nb of adj.get(comp[i])) if (!seen.has(nb)) { seen.add(nb); comp.push(nb); }
     if (comp.length > best.length) best = comp;
   }
-  const ids = best.sort((a, b) => imp(own.get(b)) - imp(own.get(a)) || (a < b ? -1 : 1)).slice(0, max), at = new Map(ids.map((id, i) => [id, i]));
+  const byImp = (a, b) => imp(own.get(b)) - imp(own.get(a)) || (a < b ? -1 : 1), isHub = id => !!own.get(id).moc;
+  const first = best.filter(isHub).sort((a, b) => adj.get(b).size - adj.get(a).size || (a < b ? -1 : 1)).slice(0, hubs);
+  const ids = [...first, ...best.filter(id => !isHub(id)).sort(byImp)].slice(0, max), at = new Map(ids.map((id, i) => [id, i]));
   const bars = [];
   for (const id of ids) for (const nb of adj.get(id)) if (at.has(nb) && at.get(id) < at.get(nb)) bars.push([at.get(id), at.get(nb)]);
   return { ids, bars, own, imp };

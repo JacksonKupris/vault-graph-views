@@ -56,12 +56,16 @@ export function backbone(D, cut = 0.1) {
   return { share, kept: share.map(s => s >= cut) };
 }
 
-// The vault's own notes that the links join (at most `max`), the `hubs` most important of them taken as the food (the mould
-// is fed between every pair in turn), and the mould grown. returns { ids, bars, pos, hubs, D, frames, kept, share }
-export function vaultSlime(nodes, links, { max = 80, hubs = 6, steps = 200 } = {}) {
-  const { ids, bars } = joinedNotes(nodes, links, { max }), food = Array.from({ length: Math.min(hubs, ids.length) }, (_, i) => i), pairs = [];
+// The vault's own notes that the links join (at most `max`) and the mould grown, fed between every pair of its food in turn.
+// The food is the vault's hub notes (its maps, at most `hubMax`, the ones with most members), so a new hub is a new place
+// the mould is fed (fed: "hubs"). A vault with fewer than two hubs is fed at its `hubs` most important notes (fed: "top").
+// Every pair is fed at least once. returns { ids, bars, pos, hubs, fed, D, frames, kept, share }
+export const HUB_MAX = 24;
+export function vaultSlime(nodes, links, { max = 80, hubs = 6, hubMax = HUB_MAX, steps = 200 } = {}) {
+  const { ids, bars, own } = joinedNotes(nodes, links, { max, hubs: hubMax }), maps = ids.map((id, i) => (own.get(id).moc ? i : -1)).filter(i => i >= 0), fed = maps.length >= 2 ? "hubs" : "top";
+  const plain = ids.map((_, i) => i).filter(i => !maps.includes(i)), food = fed === "hubs" ? maps : plain.slice(0, Math.min(hubs, plain.length)), pairs = [];
   for (let a = 0; a < food.length; a++) for (let b = a + 1; b < food.length; b++) pairs.push([food[a], food[b]]);
-  const g = pairs.length ? grow(ids.length, bars, { pairs, steps }) : { D: bars.map(() => 1), frames: [Float32Array.from(bars.map(() => 1))] };
+  const g = pairs.length ? grow(ids.length, bars, { pairs, steps: Math.max(steps, pairs.length) }) : { D: bars.map(() => 1), frames: [Float32Array.from(bars.map(() => 1))] };
   const { share, kept } = backbone(g.D);
-  return { ids, bars, pos: springLayout(ids, bars), hubs: food, D: g.D, frames: g.frames, share, kept };
+  return { ids, bars, pos: springLayout(ids, bars), hubs: food, fed, D: g.D, frames: g.frames, share, kept };
 }

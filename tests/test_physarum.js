@@ -45,7 +45,16 @@ const V = vaultSlime(nodes, links, { hubs: 3 });
 same("the vault's mould is over the notes the written links join", V.ids.length, 10);
 ok(V.bars.length === 11 && V.D.length === 11 && V.share.length === 11 && V.pos.length === 10, "a width for every link, a place for every note");
 ok(V.kept.some(k => k) && V.kept.some(k => !k), `some links carry on and some fade (${V.kept.filter(Boolean).length} of ${V.kept.length})`);
-same("the hubs are the most important notes", V.hubs, [0, 1, 2]);
+same("with no hub notes the mould is fed at the most important notes", [V.hubs, V.fed], [[0, 1, 2], "top"]);
+// the vault's hub notes are the food: each joins through the links to its members, and a new hub is one more
+{ const hubN = (id, members) => [N(id, { moc: true, inlinks: 0 }), ...members.map(m => link(id, m, "moc"))], withHubs = hs => { const add = hs.map(([id, ms]) => hubN(id, ms)); return vaultSlime(nodes.concat(add.map(a => a[0])), links.concat(add.flatMap(a => a.slice(1)))); };
+  const two = withHubs([["Hub A", ["n0", "n1", "n2"]], ["Hub B", ["n6", "n7"]]]), three = withHubs([["Hub A", ["n0", "n1", "n2"]], ["Hub B", ["n6", "n7"]], ["Hub C", ["n4"]]]);
+  same("two hub notes are the two hubs, the one with most members first", [two.fed, two.hubs.map(i => two.ids[i])], ["hubs", ["Hub A", "Hub B"]]);
+  same("a new hub note is a third hub", three.hubs.map(i => three.ids[i]), ["Hub A", "Hub B", "Hub C"]);
+  ok(two.bars.length === 11 + 5 && two.ids.length === 12, `a hub's links to its members are tubes (${two.bars.length} tubes, ${two.ids.length} notes)`);
+  same("one hub note alone is not food: the most important notes are", withHubs([["Hub A", ["n0", "n1"]]]).fed, "top");
+  const many = withHubs(Array.from({ length: 30 }, (_, i) => ["H" + String(i).padStart(2, "0"), ["n" + (i % 10), "n" + ((i + 1) % 10)]]));
+  ok(many.hubs.length === 24 && many.frames.length > 1, `at most 24 hubs feed the mould (${many.hubs.length})`); }
 ok(JSON.stringify(vaultSlime(nodes, links, { hubs: 3 }).D) === JSON.stringify(V.D), "the same vault grows the same way");
 const big = vaultSlime(Array.from({ length: 300 }, (_, i) => N("m" + i, { inlinks: i % 9 })), Array.from({ length: 299 }, (_, i) => link("m" + i, "m" + (i + 1))), { max: 60 });
 same("at most `max` notes", big.ids.length, 60);
