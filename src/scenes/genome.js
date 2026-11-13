@@ -117,7 +117,7 @@ export const genome = {
     }
     function show(L) { shown = L; paint(); invalidate(); }
     // a note is opened one way, from its body or from its name: it becomes the selected one, and the host opens it
-    function open(id) { paint(); invalidate(); onOpen(id); }
+    function open(id) { selected = id; paint(); invalidate(); onOpen(id); }
     const targets = [];
     G.beads.forEach((p, i) => targets.push({ at: p, r: 0.4, key: { kind: "day", id: i, tip: `${strand.days[i]} · ${plural(new Set(strand.rows[i]).size, "note")} named` } }));
     noteIds.forEach(id => targets.push({ at: G.notes.get(id), r: size(id), key: { kind: "note", id, tip: name(id) } }));
