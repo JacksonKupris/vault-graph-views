@@ -22,6 +22,9 @@ try {
     ok(pic.lit > 20000 && pic.colours > 40, `${view} is drawn in full colour (${pic.lit} pixels, ${pic.colours} colour groups)`);
     same(`${view}: the page doesn't scroll sideways`, await ev("document.documentElement.scrollWidth <= innerWidth"), true);
     same(`${view}: its stat line and buttons are inside the page`, await page.outside(), []);
+    // a finger target: a button at least 40 px each way, a label drawn on the canvas at least 24 (the floor)
+    const small = await ev(`[...document.querySelectorAll(".vgv-frame button")].filter(b => b.getBoundingClientRect().width > 0).map(b => { const r = b.getBoundingClientRect(), lab = !!b.closest(".vgv-labels") || getComputedStyle(b).position === "absolute" && r.height < 40 && b.parentElement && /labels/i.test(b.parentElement.className || ""); return { t: (b.title || b.textContent).slice(0, 24), w: Math.round(r.width), h: Math.round(r.height), min: lab ? 24 : 40 }; }).filter(x => Math.min(x.w, x.h) < x.min)`);
+    same(`${view}: no button is too small to press`, small, []);
     const stat = await ev(`(() => { const s = document.querySelector(".vgv-stat"); return s && s.innerText; })()`);
     ok(!!stat && stat === await ev(`${V}.stat()`), `${view}: the stat line is shown (${stat})`);
     await page.shot("phone-" + view);

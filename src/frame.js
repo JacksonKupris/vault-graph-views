@@ -41,8 +41,10 @@ export function makeFrame(el, t) {
   root.appendChild(cardEl);   // last, so labels and the tip draw under the card
 
   // every style a host's own button rules could change is set here, so a theme can't restyle or resize it
+  // the smallest a finger target may be on a phone (the plugin's --vg-tap): buttons and button rows; a label drawn on the canvas keeps the WCAG floor
+  const TAP = 40, LABEL_MIN = 24;
   function button(parent, { label, title, run, off }, style) {
-    const b = make("button", Object.assign({ pointerEvents: off ? "none" : "auto", cursor: "pointer", minHeight: "36px", height: "auto", minWidth: "36px", width: "auto", padding: "6px 14px", margin: "0",
+    const b = make("button", Object.assign({ pointerEvents: off ? "none" : "auto", cursor: "pointer", minHeight: TAP + "px", height: "auto", minWidth: TAP + "px", width: "auto", padding: "6px 14px", margin: "0",
       borderRadius: "8px", border: `1px solid ${t.muted}`, background: t.bg, color: t.fg, font: "600 13px system-ui, sans-serif", boxShadow: "none", opacity: off ? "0.35" : "1", lineHeight: "1.2" }, style || {}), parent);
     b.type = "button"; b.textContent = label; b.disabled = !!off;
     if (title) { b.title = title; b.setAttribute("aria-label", title); }
@@ -69,7 +71,7 @@ export function makeFrame(el, t) {
     for (const it of info.insights || []) {
       const row = make("div", { display: "flex", gap: "8px", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }, cardEl);
       make("div", { color: t.muted, flex: "1 1 160px", lineHeight: "1.35" }, row).textContent = it.text;
-      if (it.run) button(row, { label: it.label || "Show", title: it.title || it.label || "Show", run: it.run }, { minHeight: "30px", padding: "4px 10px", fontWeight: "500" });
+      if (it.run) button(row, { label: it.label || "Show", title: it.title || it.label || "Show", run: it.run }, { minHeight: TAP + "px", padding: "4px 10px", fontWeight: "500" });
     }
   };
   return {
@@ -111,7 +113,7 @@ export function makeFrame(el, t) {
       labelsEl.replaceChildren();
       pinned = list.map(l => {
         const style = { position: "absolute", left: "0", top: "0", whiteSpace: "nowrap", color: l.color || t.fg, textShadow: halo, font: `${l.strong ? "700 15px" : "12px"} system-ui, sans-serif`, willChange: "transform", background: backing, borderRadius: "5px", padding: "1px 5px" };
-        const n = l.run ? button(labelsEl, { label: l.text, title: l.title, run: l.run }, Object.assign(style, { minHeight: "0", minWidth: "0", padding: "3px 5px", border: "none", background: backing })) : make("div", style, labelsEl);
+        const n = l.run ? button(labelsEl, { label: l.text, title: l.title, run: l.run }, Object.assign(style, { minHeight: LABEL_MIN + "px", minWidth: LABEL_MIN + "px", padding: "3px 5px", border: "none", background: backing })) : make("div", style, labelsEl);
         if (!l.run) n.textContent = l.text;
         return { l, n, w: n.offsetWidth, h: n.offsetHeight };
       });
