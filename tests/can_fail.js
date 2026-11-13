@@ -31,6 +31,10 @@ const BREAKS = [
   { what: "a link count in an insight is wrong", file: "src/insights.js", from: 'It is held by ${plural(deg[sagging], "link")}', to: 'It is held by ${plural(deg[sagging] + 1, "link")}', test: "test_insights.js" },
   { what: "a click on a ring of the Heat clock doesn't pick its topic", file: "src/scenes/clock.js", from: `click(k) { if (k.kind === "ring") pick(k.id); }`, to: "click(k) {}", test: "test_clock.js" },
   { what: "the Heat clock counts a ring's heat against all topics, not its own busiest slot", file: "src/scenes/clock.js", from: "const v = r[d.key][s], t = v / mx;", to: "const v = r[d.key][s], t = v / 99;", test: "test_clock.js" },
+  { what: "a hub pair with no route is scored as if it were reachable", file: "src/simulate.js", from: "comp[hubs[a]] !== comp[hubs[b]] ? n :", to: "false ? n :", test: "test_simulate.js" },
+  { what: "the link under test counts as its own rival in the null model", file: "src/simulate.js", from: "others.add(key(link[0], link[1]));", to: "", test: "test_simulate.js" },
+  { what: "the null model may draw a link that already exists", file: "src/simulate.js", from: "i !== j && !taken.has(key(i, j))) return [i, j]; }", to: "i !== j) return [i, j]; }", test: "test_simulate.js" },
+  { what: "a link to itself is tested", file: "src/simulate.js", from: "if (link[0] === link[1] || taken.has", to: "if (taken.has", test: "test_simulate.js" },
 ];
 
 const only = process.argv[2];
