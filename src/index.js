@@ -16,11 +16,12 @@ import { loadpaths } from "./scenes/loadpaths.js";
 import { modes } from "./scenes/modes.js";
 import { slime } from "./scenes/slime.js";
 import { cyberpunk } from "./scenes/cyberpunk.js";
+import { city } from "./scenes/city.js";
 import { radar } from "./scenes/radar.js";
 import { clock } from "./scenes/clock.js";
 import { foodweb } from "./scenes/foodweb.js";
 
-const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk, radar, clock, foodweb };
+const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk, radar, clock, foodweb, city };
 export const VIEWS = Object.values(SCENES).map(s => ({ id: s.id, name: s.name, hint: s.hint, actions: s.actions || [] }));
 
 export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction, theme } = {}) {

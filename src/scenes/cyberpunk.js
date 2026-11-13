@@ -16,9 +16,10 @@ export const PITCH = 2.4, WINDOWS = ["#22d3ee", "#f472b6", "#facc15", "#a5f3fc"]
 export const litLevel = (n, active, stale) => (stale(n) ? 0 : active(n) > 0.3 ? 2 : 1);
 
 // Where everything stands. Pure (no GPU), so tests check it.
-//   towers [{ n, x, z, w, h, kind: "tower"|"spire"|"stall", d (district index, -1 for a stall), level }]
+//   towers [{ n, x, z, w, h, kind: "tower"|"spire"|"hall"|"stall", d (district index, -1 for a stall), level }]
+//   fresh [id]  the towers written in the week before `now`, newest first, at most 15
 //   pads [{ x, z, size, d }] · districts [{ cluster, name, notes, moc, x, z, cars }] · cell (a district's side) · front (z of the street of stalls)
-export function cityLayout(data) {
+export function cityLayout(data, { hall = false, now = Date.now() } = {}) {
   const importance = importanceOf(data.nodes), active = activityOf(data.nodes), stale = staleOf(data);
   const ds = districtsOf(data), cell = Math.max(...ds.map(d => gridDims(d.notes.length).cols), 2) * PITCH + 3;
   const { cols, rows } = gridDims(Math.max(ds.length, 1), 0.8), towers = [], pads = [], placed = new Set();
@@ -34,7 +35,8 @@ export function cityLayout(data) {
     });
     if (d.moc) {
       const top = Math.max(3, ...towers.filter(t => t.d === i).map(t => t.h));
-      towers.push({ n: d.moc, x: d.x, z: d.z - cell / 2 + 1.6, w: 0.9, h: top + 3, kind: "spire", d: i, level: 2 }); placed.add(d.moc.id);
+      // the topic's map: a spire over the district, or (hall) a low town hall at its front
+      towers.push(hall ? { n: d.moc, x: d.x, z: d.z + cell / 2 - 1.3, w: 1.4, h: 1.1, kind: "hall", d: i, level: 2 } : { n: d.moc, x: d.x, z: d.z - cell / 2 + 1.6, w: 0.9, h: top + 3, kind: "spire", d: i, level: 2 }); placed.add(d.moc.id);
     }
     d.cars = Math.round(2 + 10 * Math.min(1, d.notes.reduce((s, n) => s + active(n), 0) / 6));
   });
@@ -45,16 +47,19 @@ export function cityLayout(data) {
     const [u] = scatter("stall:" + n.id);
     towers.push({ n, x: x0 - cell / 2 + 2 + u * span, z: front + (hash(n.id) % 3) * 1.4, w: 0.7, h: 0.8, kind: "stall", d: -1, level: 1 });
   }
-  return { towers, pads, districts: ds, cell, front, bounds: { x: [x0 - cell / 2, -x0 + cell / 2], z: [z0 - cell / 2, front + 3] } };
+  // the notes written in the last week, newest first, at most 15: the ones a look may mark as new (the City's cranes)
+  const week = now - 7 * 864e5, bornAt = t => (typeof t.n.born === "string" ? Date.parse(t.n.born) : NaN);
+  const fresh = towers.filter(t => t.kind === "tower" && bornAt(t) >= week).sort((a, b) => bornAt(b) - bornAt(a)).slice(0, 15).map(t => t.n.id);
+  return { towers, pads, districts: ds, cell, front, fresh, bounds: { x: [x0 - cell / 2, -x0 + cell / 2], z: [z0 - cell / 2, front + 3] } };
 }
 
 // a sheet of windows, 8 x 8 to the tile: lit ones coloured, the rest a dim pane; a tower tiles it by its size
-function windows(lit) {
+function windows(lit, sheet) {
   const c = document.createElement("canvas"); c.width = c.height = 128;
-  const g = c.getContext("2d"); g.fillStyle = "#2a2a36"; g.fillRect(0, 0, 128, 128);
+  const g = c.getContext("2d"); g.fillStyle = sheet.wall; g.fillRect(0, 0, 128, 128);
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
     const h = (hash(`${lit}:${x}:${y}`) % 1000) / 1000, on = h < lit;
-    g.fillStyle = on ? WINDOWS[(x + y * 3) % WINDOWS.length] : "#3a3a4a"; g.globalAlpha = on ? 0.55 + 0.45 * (h / lit) : 0.5;
+    g.fillStyle = on ? sheet.lit[(x + y * 3) % sheet.lit.length] : sheet.pane; g.globalAlpha = on ? 0.55 + 0.45 * (h / lit) : 0.5;
     g.fillRect(x * 16 + 3, y * 16 + 3, 10, 11);
   }
   const t = new CanvasTexture(c); t.wrapS = t.wrapT = RepeatWrapping; t.colorSpace = SRGBColorSpace; t.magFilter = NearestFilter;
@@ -62,20 +67,36 @@ function windows(lit) {
 }
 const mix = (a, b, f) => new Color(a).lerp(new Color(b), f);
 
-export const cyberpunk = {
+// The Cyberpunk look. A look dresses the one city: its words, colours, where the cars run, and whether a map is a spire or a town hall.
+const NEON = {
   id: "cyberpunk", name: "Cyberpunk", hint: "A neon city: topics are districts, notes are towers, stale ones go dark",
-  home: { yaw: 0.55, pitch: 0.38, dist: 58, min: 12, max: 140 }, stage: { fog: [55, 170], ambient: 0.4 },
+  stage: { fog: [55, 170], ambient: 0.4 }, tower: "tower", hall: false, cranes: false,
+  sheet: { wall: "#2a2a36", pane: "#3a3a4a", lit: WINDOWS }, beacon: BEACON, beaconName: "pink", stall: STALL, arc: "#22d3ee",
+  wall: (c, level) => mix(c, "#ffffff", level === 0 ? 0.55 : 0.3).multiplyScalar(level === 0 ? 0.5 : 1),
+  // cars fly an air lane over the district
+  lane: (u, v, i, cell) => ({ y: 4 + v * 8, z: (u - 0.5) * (cell - 3), c: i % 3 ? "#fca5a5" : "#e0f2fe" }),
+  stat: s => `${plural(s.towers, "tower")} · ${s.dark} dark · ${plural(s.districts, "district")}`,
+  plain: "Picture your notes as a city. A tall tower is a note everything else leans on. Lit windows mean someone has been in it lately; a dark tower has been left alone for a long time.",
+  about: "Each topic is a district and each note a tower. Height is how many notes link to it and how much runs through it; lit windows are how recently it was edited; dark is stale. A pink beacon on a roof is an open task, the tall thin spire is the topic's map, and a stall on the street is a note in no topic.",
+  legend: [{ color: "#22d3ee", text: "height = relied on, windows = recent" }, { color: "#6b7280", text: "dark = stale" }, { color: BEACON, text: "beacon = open task" }, { color: STALL, text: "stall = no topic" }],
+};
+const HALL = "#e5e7eb", CRANE = "#facc15";
+
+// One city, dressed by a look (NEON above; the City view's is in city.js). Everything a look doesn't name is shared.
+export const cityScene = look => ({
+  id: look.id, name: look.name, hint: look.hint,
+  home: { yaw: 0.55, pitch: 0.38, dist: 58, min: 12, max: 140 }, stage: look.stage,
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
-    const L = cityLayout(data), T = L.towers, own = T.filter(t => t.kind !== "stall");
+    const L = cityLayout(data, { hall: look.hall }), T = L.towers, own = T.filter(t => t.kind !== "stall");
     if (own.length < 3) {
       const stat = () => plural(T.length, "note");
       frame.stat(stat());
-      frame.controls({ at: "centre", lines: ["Cyberpunk needs notes in topics, linked to one another.", `${plural(own.length, "tower")} so far.`], buttons: [{ label: "Open the graph", title: "Open the graph", run: () => onAction("graph") }] });
+      frame.controls({ at: "centre", lines: [`${look.name} needs notes in topics, linked to one another.`, `${plural(own.length, look.tower)} so far.`], buttons: [{ label: "Open the graph", title: "Open the graph", run: () => onAction("graph") }] });
       return { targets: () => [], click() {}, update() {}, stat, today: () => null, api: { empty: true } };
     }
     const byId = new Map(T.map(t => [t.n.id, t])), name = t => t.n.name, add = o => { stage.scene.add(o); return o; };
-    const neon = t => (t.kind === "stall" ? STALL : theme.palette[(t.n.cluster || 0) % theme.palette.length]);
+    const neon = t => (t.kind === "stall" ? look.stall : t.kind === "hall" ? HALL : theme.palette[(t.n.cluster || 0) % theme.palette.length]);
     const nb = new Map(), join = (a, b) => { if (!nb.has(a)) nb.set(a, new Set()); nb.get(a).add(b); };
     for (const l of data.links) if (l.kind !== "wanted" && byId.has(l.source) && byId.has(l.target)) { join(l.source, l.target); join(l.target, l.source); }
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -84,12 +105,12 @@ export const cyberpunk = {
     // the districts' streets: a dark pad tinted with the topic's colour, and the street of stalls in front
     const pads = add(new InstancedMesh(new BoxGeometry(1, 0.1, 1), new MeshBasicMaterial(), L.pads.length));
     L.pads.forEach((p, i) => { pads.setMatrixAt(i, m4.makeScale(p.size, 1, p.size).setPosition(p.x, -0.05, p.z)); pads.setColorAt(i, mix(theme.palette[L.districts[p.d].cluster % theme.palette.length], theme.bg, 0.86)); });
-    const street = add(new Mesh(new BoxGeometry(L.bounds.x[1] - L.bounds.x[0], 0.1, 5), new MeshBasicMaterial({ color: mix(STALL, theme.bg, 0.9) })));
+    const street = add(new Mesh(new BoxGeometry(L.bounds.x[1] - L.bounds.x[0], 0.1, 5), new MeshBasicMaterial({ color: mix(look.stall, theme.bg, 0.9) })));
     street.position.set((L.bounds.x[0] + L.bounds.x[1]) / 2, -0.06, L.front + 0.5);
 
     // one mesh a lit level: the walls of every tower of that level, windows tiled by the tower's size, tinted by its district
     const parts = [0, 1, 2].map(level => {
-      const list = T.filter(t => t.level === level && t.kind !== "stall"), pos = [], uv = [], idx = [];
+      const list = T.filter(t => t.level === level && (t.kind === "tower" || t.kind === "spire")), pos = [], uv = [], idx = [];
       list.forEach(t => {
         const hw = t.w / 2, o = (hash(t.n.id) % 8) / 8;
         for (const [ax, az, bx, bz] of [[-hw, -hw, hw, -hw], [hw, -hw, hw, hw], [hw, hw, -hw, hw], [-hw, hw, -hw, -hw]]) {
@@ -102,40 +123,49 @@ export const cyberpunk = {
       });
       const geo = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(pos, 3)).setAttribute("uv", new Float32BufferAttribute(uv, 2)).setAttribute("color", new Float32BufferAttribute(new Float32Array(pos.length), 3));
       geo.setIndex(idx);
-      const mesh = add(new Mesh(geo, new MeshBasicMaterial({ map: windows([0.04, 0.28, 0.7][level]), vertexColors: true, side: DoubleSide })));
+      const mesh = add(new Mesh(geo, new MeshBasicMaterial({ map: windows([0.04, 0.28, 0.7][level], look.sheet), vertexColors: true, side: DoubleSide })));
       mesh.frustumCulled = false;
       return { list, geo, mesh };
     });
     // each tower's top (a stall is one low box): one flat box each, in the district's neon
     const roofs = add(new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial(), T.length));
     roofs.frustumCulled = false;
-    const tasks = T.filter(t => t.n.tasks > 0), beacons = add(new InstancedMesh(new SphereGeometry(1, 10, 8), new MeshBasicMaterial({ color: BEACON }), Math.max(tasks.length, 1)));
+    const tasks = T.filter(t => t.n.tasks > 0), beacons = add(new InstancedMesh(new SphereGeometry(1, 10, 8), new MeshBasicMaterial({ color: look.beacon }), Math.max(tasks.length, 1)));
     beacons.count = tasks.length; beacons.frustumCulled = false;
     tasks.forEach((t, i) => beacons.setMatrixAt(i, m4.makeScale(0.28, 0.28, 0.28).setPosition(t.x, t.h + 0.35, t.z)));
     // the cars of each district's air lane
-    const cars = L.districts.flatMap(d => Array.from({ length: d.cars }, (_, i) => { const [u, v] = scatter(`car:${d.cluster}:${i}`); return { d, u, y: 4 + v * 8, z: (u - 0.5) * (L.cell - 3), v: (0.02 + v * 0.05) * (i % 2 ? 1 : -1), c: i % 3 ? "#fca5a5" : "#e0f2fe" }; }));
+    const cars = L.districts.flatMap(d => Array.from({ length: d.cars }, (_, i) => { const [u, v] = scatter(`car:${d.cluster}:${i}`); return { d, u, v: (0.02 + v * 0.05) * (i % 2 ? 1 : -1), ...look.lane(u, v, i, L.cell) }; }));
     const carMesh = add(new InstancedMesh(new BoxGeometry(0.7, 0.12, 0.14), new MeshBasicMaterial(), Math.max(cars.length, 1)));
     carMesh.count = cars.length; carMesh.frustumCulled = false; cars.forEach((c, i) => carMesh.setColorAt(i, new Color(c.c)));
-    const arcs = add(new LineSegments(new BufferGeometry(), new LineBasicMaterial({ color: "#22d3ee", transparent: true, opacity: 0.9 }))); arcs.frustumCulled = false;
+    const arcs = add(new LineSegments(new BufferGeometry(), new LineBasicMaterial({ color: look.arc, transparent: true, opacity: 0.9 }))); arcs.frustumCulled = false;
+
+    // a crane on each of the newest towers and a flag over each town hall: thin boxes in one mesh
+    const cranes = look.cranes ? L.fresh.map(id => byId.get(id)) : [], halls = T.filter(t => t.kind === "hall"), bars = [];
+    for (const t of cranes) bars.push([t.x + t.w / 2, t.h + 0.8, t.z + t.w / 2, 0.09, 1.6, 0.09, CRANE], [t.x + t.w / 2 - 0.45, t.h + 1.55, t.z + t.w / 2, 1.5, 0.09, 0.09, CRANE]);
+    for (const t of halls) bars.push([t.x, t.h + 0.7, t.z, 0.07, 1.4, 0.07, "#94a3b8"], [t.x + 0.32, t.h + 1.2, t.z, 0.6, 0.36, 0.05, theme.palette[L.districts[t.d].cluster % theme.palette.length]]);
+    const extras = add(new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial(), Math.max(bars.length, 1)));
+    extras.count = bars.length; extras.frustumCulled = false;
+    bars.forEach(([x, y, z, sx, sy, sz, c], i) => { extras.setMatrixAt(i, m4.makeScale(sx, sy, sz).setPosition(x, y, z)); extras.setColorAt(i, new Color(c)); });
+    const tallest = T.filter(t => t.kind === "tower").sort((a, b) => b.h - a.h)[0] || null;
 
     let selected = inputs.selected && byId.has(inputs.selected) ? inputs.selected : null, hovered = null, only = null, held = reduced;
     const focus = () => hovered || selected, lit = new Set(), showing = t => (only == null || t.d === only || t.d < 0) && (!focus() || lit.has(t.n.id));
     const dark = T.filter(t => t.kind === "tower" && t.level === 0), darkIn = d => dark.filter(t => t.d === d);
     const stat = () => {
       const f = focus() && byId.get(focus());
-      if (f && f.kind === "spire") return `${name(f)} · map of ${plural(L.districts[f.d].notes.length, "note")}`;
+      if (f && (f.kind === "spire" || f.kind === "hall")) return `${name(f)} · map of ${plural(L.districts[f.d].notes.length, "note")}`;
       if (f) return `${name(f)} · ${plural(f.n.inlinks || 0, "link")} in · ${f.level === 0 ? "dark" : f.level === 2 ? "busy" : "dim"}${f.n.tasks ? ` · ${plural(f.n.tasks, "open task")}` : ""}`;
-      return `${plural(T.filter(t => t.kind === "tower").length, "tower")} · ${dark.length} dark · ${plural(L.districts.length, "district")}`;
+      return look.stat({ towers: T.filter(t => t.kind === "tower").length, dark: dark.length, districts: L.districts.length, fresh: L.fresh.length, tallest: tallest ? clip(name(tallest), 22) : "" });
     };
     function paint() {
       const f = focus(); lit.clear(); if (f) { lit.add(f); for (const id of nb.get(f) || []) lit.add(id); }
       for (const p of parts) {
         const c = p.geo.getAttribute("color"); let at = 0;
-        p.list.forEach(t => { const tint = mix(neon(t), "#ffffff", t.level === 0 ? 0.55 : 0.3).multiplyScalar(showing(t) ? (t.level === 0 ? 0.5 : 1) : 0.16); for (let k = 0; k < 16; k++) c.setXYZ(at++, tint.r, tint.g, tint.b); });
+        p.list.forEach(t => { const tint = look.wall(neon(t), t.level).multiplyScalar(showing(t) ? 1 : 0.16); for (let k = 0; k < 16; k++) c.setXYZ(at++, tint.r, tint.g, tint.b); });
         c.needsUpdate = true;
       }
       T.forEach((t, i) => {
-        const stall = t.kind === "stall", w = stall ? t.w : t.w * 1.04;
+        const stall = t.kind === "stall" || t.kind === "hall", w = stall ? t.w : t.w * 1.04;
         roofs.setMatrixAt(i, m4.makeScale(w, stall ? t.h : 0.12, w).setPosition(t.x, stall ? t.h / 2 : t.h + 0.06, t.z));
         roofs.setColorAt(i, mix(neon(t), theme.bg, showing(t) ? (t.level === 0 ? 0.55 : 0) : 0.85));
       });
@@ -150,25 +180,26 @@ export const cyberpunk = {
         }
       }
       arcs.geometry.setAttribute("position", new Float32BufferAttribute(pts, 3)); arcs.visible = pts.length > 0;
-      const labels = L.districts.map((d, i) => ({ d, i })).filter(x => only == null || only === x.i).map(({ d }) => ({ text: clip(d.name, 28), at: [d.x, 0.4, d.z + L.cell / 2 - 0.6], color: mix(theme.palette[d.cluster % theme.palette.length], "#ffffff", 0.45).getStyle(), dy: 6 }));
+      const labels = L.districts.map((d, i) => ({ d, i })).filter(x => only == null || only === x.i).map(({ d }) => ({ text: clip(d.name, 28) + (look.hall && !d.moc ? " · no map" : ""), at: [d.x, 0.4, d.z + L.cell / 2 - 0.6], color: mix(theme.palette[d.cluster % theme.palette.length], "#ffffff", 0.45).getStyle(), dy: 6 }));
       if (f) { const t = byId.get(f); labels.unshift({ text: clip(name(t), 34), at: [t.x, t.h, t.z], strong: true, dy: -18, run: () => open(f), title: `Open ${name(t)}` }); }
       frame.labels(labels); frame.stat(stat());
       frame.chip(only == null ? null : `District: ${clip(L.districts[only].name, 24)}`, () => { only = null; paint(); invalidate(); });
     }
     function open(id) { selected = id; paint(); invalidate(); onOpen(id); }
+    const show = id => { only = null; selected = id; paint(); invalidate(); };
     const goTo = d => { only = d; selected = null; paint(); invalidate(); };
     const worst = L.districts.map((_, i) => [darkIn(i).length, i]).sort((a, b) => b[0] - a[0])[0], stalls = T.filter(t => t.kind === "stall"), staleTall = [...dark].sort((a, b) => b.h - a.h)[0];
     const insights = [];
     if (worst && worst[0]) insights.push({ text: `${L.districts[worst[1]].name} is the darkest district: ${plural(worst[0], "stale note")}. Open the tallest and decide whether it is still true.`, label: "Show district", run: () => goTo(worst[1]) });
     if (staleTall && staleTall.h > 3) insights.push({ text: `${name(staleTall)} stands tall yet has gone dark: other notes lean on it and it has not been edited in ${staleTall.n.age} days.`, label: "Open note", run: () => open(staleTall.n.id) });
-    if (tasks.length) insights.push({ text: `${plural(tasks.length, "tower")} carry a pink beacon: an open task. The tallest is the one the most notes wait on.`, label: "Open note", run: () => open([...tasks].sort((a, b) => b.h - a.h)[0].n.id) });
-    if (stalls.length) insights.push({ text: `${plural(stalls.length, "note")} stand as stalls on the street, in no topic. Link each to a topic's notes and it gets a tower.`, label: "Open note", run: () => open(stalls[0].n.id) });
-    frame.explain({
-      plain: "Picture your notes as a city. A tall tower is a note everything else leans on. Lit windows mean someone has been in it lately; a dark tower has been left alone for a long time.",
-      about: "Each topic is a district and each note a tower. Height is how many notes link to it and how much runs through it; lit windows are how recently it was edited; dark is stale. A pink beacon on a roof is an open task, the tall thin spire is the topic's map, and a stall on the street is a note in no topic.",
-      legend: [{ color: "#22d3ee", text: "height = relied on, windows = recent" }, { color: "#6b7280", text: "dark = stale" }, { color: BEACON, text: "beacon = open task" }, { color: STALL, text: "stall = no topic" }], insights,
-    });
-    frame.controls({ lines: ["Pick a tower to see what it links to"] });
+    if (tasks.length) insights.push({ text: `${plural(tasks.length, look.tower)} with a ${look.beaconName} beacon: an open task. The tallest is the one the most notes wait on.`, label: "Open note", run: () => open([...tasks].sort((a, b) => b.h - a.h)[0].n.id) });
+    if (stalls.length) insights.push({ text: `${plural(stalls.length, "note")} stand as stalls on the street, in no topic. Link each to a topic's notes and it gets a ${look.tower}.`, label: "Open note", run: () => open(stalls[0].n.id) });
+    if (look.cranes && tallest) insights.unshift({ text: `${name(tallest)} is the tallest ${look.tower}: ${plural(tallest.n.inlinks || 0, "note")} link to it.`, label: "Show tallest", run: () => show(tallest.n.id) });
+    if (cranes.length) insights.push({ text: `${plural(cranes.length, look.tower)} went up this week, each with a crane. The newest is ${name(cranes[0])}: link it to the notes it belongs with.`, label: "Open note", run: () => open(cranes[0].n.id) });
+    const noMap = L.districts.filter(d => !d.moc);
+    if (look.hall && noMap.length) insights.push({ text: `${plural(noMap.length, "district")} have no town hall: the topic has no map note. The biggest is ${noMap[0].name}.`, label: "Show district", run: () => goTo(L.districts.indexOf(noMap[0])) });
+    frame.explain({ plain: look.plain, about: look.about, legend: look.legend, insights });
+    frame.controls({ lines: [`Pick a ${look.tower} to see what it links to`] });
     paint();
     const started = performance.now();
     const drive = t => {
@@ -186,8 +217,9 @@ export const cyberpunk = {
       frame() { if (held) return; const t = (performance.now() - started) / 1000; beacons.visible = Math.sin(t * 4) > -0.3; drive(t); clearTimeout(timer); timer = setTimeout(invalidate, 33); },
       stat,
       today: () => (worst && worst[0] ? { text: `Darkest district: ${L.districts[worst[1]].name} · ${plural(worst[0], "stale note")}`, label: "Go there", run: () => goTo(worst[1]) } : null),
-      api: { layout: () => L, selected: () => selected, district: () => (only == null ? null : L.districts[only].cluster), hold() { held = true; beacons.visible = true; invalidate(); }, towers: () => T.filter(t => t.kind === "tower").length, stalls: () => stalls.length, dark: () => dark.length },
-      dispose() { held = true; clearTimeout(timer); for (const o of [pads, street, roofs, beacons, carMesh, arcs, ...parts.map(p => p.mesh)]) { if (o.material.map) o.material.map.dispose(); } },
+      api: { layout: () => L, selected: () => selected, district: () => (only == null ? null : L.districts[only].cluster), hold() { held = true; beacons.visible = true; invalidate(); }, towers: () => T.filter(t => t.kind === "tower").length, stalls: () => stalls.length, dark: () => dark.length, halls: () => halls.length, cranes: () => cranes.length, tallest: () => (tallest ? tallest.n.id : null) },
+      dispose() { held = true; clearTimeout(timer); for (const o of [pads, street, roofs, beacons, carMesh, arcs, extras, ...parts.map(p => p.mesh)]) { if (o.material.map) o.material.map.dispose(); } },
     };
   },
-};
+});
+export const cyberpunk = cityScene(NEON);
