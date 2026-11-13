@@ -1,7 +1,7 @@
 // Would one more link help? The score is how easily the main notes reach each other: the mean
 // effective resistance between every pair of hubs (1 for a single link, lower is better connected).
 // A pair with no route costs the size of the vault. A gain only counts when it beats a null model:
-// the same number of links added between random unlinked notes.
+// the same number of links added between random unlinked notes (never a note the candidates leave out, such as a hub).
 import { pressures } from "./physarum.js";
 
 // A small seeded random generator (mulberry32): the same seed gives the same run on any computer.
@@ -51,33 +51,36 @@ export function scorer(n, bars, hubs) {
 
 const key = (i, j) => (i < j ? i + "," + j : j + "," + i);
 
-// A random link between two notes that are not linked yet (null when the vault is complete).
-export function randomNonEdge(n, taken, rand) {
-  for (let t = 0; t < 200; t++) { const i = Math.floor(rand() * n), j = Math.floor(rand() * n); if (i !== j && !taken.has(key(i, j))) return [i, j]; }
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (!taken.has(key(i, j))) return [i, j];
+// A random link between two notes that are not linked yet (null when the vault is complete). Nodes in `skip` are never an end:
+// the rival of a suggested link is a link a person could add, so it is drawn from the same pool as the candidates.
+export function randomNonEdge(n, taken, rand, skip = null) {
+  const free = (i, j) => i !== j && !taken.has(key(i, j)) && !(skip && (skip.has(i) || skip.has(j)));
+  for (let t = 0; t < 200; t++) { const i = Math.floor(rand() * n), j = Math.floor(rand() * n); if (free(i, j)) return [i, j]; }
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (free(i, j)) return [i, j];
   return null;
 }
 
 // Gain of adding `link`, and how often a random link does at least as well (p, with the +1 so it is never 0).
-export function testAdd(n, bars, hubs, link, { shuffles = 50, seed = 1, fast } = {}) {
+export function testAdd(n, bars, hubs, link, { shuffles = 50, seed = 1, fast, skip = null } = {}) {
   const sc = fast === undefined ? scorer(n, bars, hubs) : fast;
   const base = sc ? sc.base : score(n, bars, hubs), after = l => (sc ? sc.after(l) : score(n, [...bars, l], hubs));
   const taken = new Set(bars.map(([i, j]) => key(i, j)));
-  if (link[0] === link[1] || taken.has(key(link[0], link[1]))) return { gain: 0, p: 1, valid: false };
+  const out = skip && skip.length ? new Set(skip) : null;
+  if (link[0] === link[1] || taken.has(key(link[0], link[1])) || (out && (out.has(link[0]) || out.has(link[1])))) return { gain: 0, p: 1, valid: false };
   const gain = base - after(link), rand = rng(seed);
   let count = 0;
   const others = new Set(taken); others.add(key(link[0], link[1]));   // the link under test is not its own rival
   for (let s = 0; s < shuffles; s++) {
-    const r = randomNonEdge(n, others, rand); if (!r) break;
+    const r = randomNonEdge(n, others, rand, out); if (!r) break;
     if (base - after(r) >= gain) count++;
   }
   return { gain, p: (1 + count) / (1 + shuffles), valid: true };
 }
 
 // Candidate links, best first: only those that beat the null model (p < alpha) and gain at least minGain.
-export function rank(n, bars, hubs, candidates, { shuffles = 50, seed = 1, alpha = 0.05, minGain = 1e-3 } = {}) {
+export function rank(n, bars, hubs, candidates, { shuffles = 50, seed = 1, alpha = 0.05, minGain = 1e-3, skip = null } = {}) {
   const fast = scorer(n, bars, hubs);
-  return candidates.map(link => ({ link, ...testAdd(n, bars, hubs, link, { shuffles, seed, fast }) }))
+  return candidates.map(link => ({ link, ...testAdd(n, bars, hubs, link, { shuffles, seed, fast, skip }) }))
     .filter(r => r.valid && r.p < alpha && r.gain >= minGain).sort((a, b) => b.gain - a.gain || a.p - b.p);
 }
 
@@ -97,7 +100,7 @@ export function candidates(n, bars, { max = 200, seed = 1, skip = null } = {}) {
 export function simulate(n, bars, hubs, { steps = 5, max = 200, shuffles = 50, seed = 1, alpha = 0.05, minGain = 1e-3, skip = null } = {}) {
   let cur = bars.map(([i, j]) => [i, j]); const out = [], start = score(n, cur, hubs);
   for (let s = 0; s < steps; s++) {
-    const best = rank(n, cur, hubs, candidates(n, cur, { max, seed: seed + s, skip }), { shuffles, seed: seed + s, alpha, minGain })[0];
+    const best = rank(n, cur, hubs, candidates(n, cur, { max, seed: seed + s, skip }), { shuffles, seed: seed + s, alpha, minGain, skip })[0];
     if (!best) break;
     cur = [...cur, best.link]; out.push(best);
   }
