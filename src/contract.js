@@ -19,6 +19,9 @@ export const FOLD_SHAPE = { n: "number", X: "array", stress: "number", grade: "s
 // inputs.scan (Cas9): the Guide scan's result. notes: [{ path, hits }] (hits 0 is a look-alike). ids, when given, is the
 // scan's scope (the notes in its folder or tag); where says that scope in words. No scan yet: leave it out.
 export const SCAN_SHAPE = { guide: "string", where: "string", notes: "array" };
+// inputs.web (Food web): the plugin's VGScience.webForViews. level[i] is the trophic height of ids[i]; edges are [from, to] indexes into ids
+// (from links to, so rests on, to); stats are the web's figures.
+export const WEB_SHAPE = { ids: "array", level: "array", edges: "array", stats: "object" };
 export const THEME_TOKENS = ["bg", "fg", "muted", "accent", "warn", "palette"];
 
 const typeOf = v => (Array.isArray(v) ? "array" : v === null ? "null" : typeof v);
@@ -58,6 +61,17 @@ export function checkInputs(view, data, inputs) {
     if (f.n !== s.days.length || f.X.length !== f.n) out.push(`inputs.fold is for ${f.n} days (${f.X.length} points) and data.strand has ${s.days.length}: the fold is from other data`);
     const bad = f.loops.filter(l => !(l.a >= 0 && l.a < f.n && l.b >= 0 && l.b < f.n && typeof l.count === "number")).length;
     if (bad) out.push(`${bad} of inputs.fold.loops don't name two days of the strand and a count`);
+  }
+  if (view === "foodweb") {
+    if (typeOf(inp.web) !== "object") return out.concat(`inputs.web should be object, is ${typeOf(inp.web)}`);
+    part(out, "inputs.web", inp.web, WEB_SHAPE);
+    if (out.length) return out;
+    const w = inp.web;
+    if (w.level.length !== w.ids.length) out.push(`inputs.web has ${w.ids.length} ids and ${w.level.length} levels: they should be the same`);
+    const bad = w.edges.filter(e => !(e[0] >= 0 && e[0] < w.ids.length && e[1] >= 0 && e[1] < w.ids.length)).length;
+    if (bad) out.push(`${bad} of inputs.web.edges don't name two of its ids`);
+    for (const k of ["mean", "maxLevel", "incoherence"]) if (typeof w.stats[k] !== "number") out.push(`inputs.web.stats.${k} should be number, is ${typeOf(w.stats[k])}`);
+    if (out.length) return out;
   }
   if (view === "cas9" && inp.scan != null) {
     if (typeOf(inp.scan) !== "object") return [`inputs.scan should be object, is ${typeOf(inp.scan)}`];

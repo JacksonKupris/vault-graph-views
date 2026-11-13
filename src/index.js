@@ -18,8 +18,9 @@ import { slime } from "./scenes/slime.js";
 import { cyberpunk } from "./scenes/cyberpunk.js";
 import { radar } from "./scenes/radar.js";
 import { clock } from "./scenes/clock.js";
+import { foodweb } from "./scenes/foodweb.js";
 
-const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk, radar, clock };
+const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk, radar, clock, foodweb };
 export const VIEWS = Object.values(SCENES).map(s => ({ id: s.id, name: s.name, hint: s.hint, actions: s.actions || [] }));
 
 export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction, theme } = {}) {
