@@ -5,7 +5,8 @@
 //   controls({ at, lines, buttons })    the next step. at "bottom" (default) or "centre" (an empty state);
 //                                       lines [text...] first is the main one; buttons [{ label, title, run, off }]
 //   explain({ legend, plain, about, insights })  what the colours mean (legend [{color, text}], always shown under the stat line) and a card behind
-//                                       an Insights button: about (how the notes relate to the formula), insights [{ text, label, run }]
+//                                       an Insights button: about (how the notes relate to the formula), insights [{ text, label, run, extra: [{ label, title, run }] }]
+//   card(open)                          open or close that card
 //   chip(text, clear)                   a filter in force, with its way out; chip(null) takes it away
 //   labels([{ text, at, color, dy, run, title, strong }])   names pinned to points of the scene, first wins a clash
 //   tip(text, x, y)                     at a point of the canvas; tip(null) hides it
@@ -71,7 +72,8 @@ export function makeFrame(el, t) {
     for (const it of info.insights || []) {
       const row = make("div", { display: "flex", gap: "8px", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }, cardEl);
       make("div", { color: t.muted, flex: "1 1 160px", lineHeight: "1.35" }, row).textContent = it.text;
-      if (it.run) button(row, { label: it.label || "Show", title: it.title || it.label || "Show", run: it.run }, { minHeight: TAP + "px", padding: "4px 10px", fontWeight: "500" });
+      const own = [...(it.run ? [{ label: it.label || "Show", title: it.title || it.label || "Show", run: it.run }] : []), ...(it.extra || [])];
+      for (const b of own) button(row, b, { minHeight: TAP + "px", padding: "4px 10px", fontWeight: "500" });
     }
   };
   return {
@@ -82,6 +84,8 @@ export function makeFrame(el, t) {
       if (!info) cardOpen = false;
       markLegend(); drawCard(); this.controls(lastControls);
     },
+    // open or close the insights card (a view that has just produced rows shows them)
+    card(open) { cardOpen = !!open && !!info; drawCard(); this.controls(lastControls); },
     // text: what a ring means (null takes the legend item away); the rings themselves are placed by rings()
     mark(text) { markText = text || null; markLegend(); },
     // items [{ at, r, n }]: a ring round each point (two rings when n > 1), kept where the point is now

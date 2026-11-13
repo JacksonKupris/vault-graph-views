@@ -12,7 +12,7 @@ const text = sel => ev(`(document.querySelector(${JSON.stringify(sel)}) || {}).i
 const wait = ms => new Promise(r => setTimeout(r, ms));
 try {
   same("Slime mould mounts with the sample graph", await page.mount("slime"), null);
-  same("the view says which it is, and what it asks of the host", await ev(`[${V}.view, VaultGraphViews.VIEWS.find(v => v.id === "slime").actions]`), ["slime", ["graph"]]);
+  same("the view says which it is, and what it asks of the host", await ev(`[${V}.view, VaultGraphViews.VIEWS.find(v => v.id === "slime").actions]`), ["slime", ["graph", "add-link", "decline-link"]]);
   const ids = await ev(`${A}.ids()`), hubs = await ev(`${A}.hubs()`), links = await ev(`${A}.links()`);
   ok(ids.length >= 10 && hubs.length >= 2 && links >= ids.length - 1, `notes, hubs and links (${ids.length} notes, ${hubs.length} hubs, ${links} links)`);
   same("it starts growing", [await ev(`${A}.step()`) < await ev(`${A}.steps()`), await ev(`${A}.playing()`)], [true, true]);
@@ -66,6 +66,29 @@ try {
   ok(today && /^\d+ of \d+ links carry the vault between its \d+ hubs$/.test(today.text) && today.label === "Show it", `the today strip: ${JSON.stringify(today)}`);
   await ev(`${A}.setStep(0); ${V}.today().run()`);
   same("its button shows the finished backbone", await ev(`${A}.step()`), await ev(`${A}.steps()`));
+
+  // Simulate: rows of links that beat random links; Add and Decline call the host and the row moves on; nothing is written by the view
+  ok(await page.press("Find links that would shorten the routes between your hubs, and test each against random links"), "Simulate is there to press");
+  await page.drawn();
+  const rows = async () => ev(`[...document.querySelectorAll(".vgv-insights > div")].map(r => ({ text: r.firstChild.textContent, buttons: [...r.querySelectorAll("button")].map(b => b.textContent) })).filter(r => r.buttons[0] === "Add link" || /^No (link|more)/.test(r.text))`);
+  const found = await rows();
+  ok(found.length >= 1, `Simulate lists a result (${found.length} rows)`);
+  const first = found[0];
+  ok(first.buttons[0] === "Add link" ? /^Link .+ to .+: routes between your hubs get [0-9]+% shorter[.] A random link would do this about 1 in [0-9]+ times[.]$/.test(first.text) && first.buttons.join() === "Add link,Decline,Show"
+     : /^No link does better/.test(first.text), `the row says what it does and offers Add, Decline and Show: ${first.text}`);
+  if (first.buttons[0] === "Add link") {
+    await ev("window.__actions.length = 0; window.__actionDetail = null");
+    await ev(`[...document.querySelectorAll(".vgv-insights button")].find(b => b.textContent === "Decline").click()`);
+    same("Decline tells the host which link", await ev("[window.__actions.slice(), Object.keys(window.__actionDetail || {})]"), [["decline-link"], ["from", "to"]]);
+    const left = await rows();
+    ok(left.length === found.length - 1 || (found.length === 1 && /^No more links/.test(left[0].text)), `the declined row is gone and the next is first (${left.length} left)`);
+    if (left.length && left[0].buttons[0] === "Add link") {
+      await ev("window.__actions.length = 0");
+      await ev(`[...document.querySelectorAll(".vgv-insights button")].find(b => b.textContent === "Add link").click()`);
+      same("Add link tells the host", await ev("[window.__actions.slice(), Object.keys(window.__actionDetail || {})]"), [["add-link"], ["from", "to"]]);
+    }
+  }
+  await page.shot("slime-simulate");
 
   await ev("window.__opened = null");
   const empty = (await page.grid(20)).find(p => !p.key), before = await ev(`${V}.turn()`);

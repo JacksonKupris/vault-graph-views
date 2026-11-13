@@ -25,7 +25,7 @@
         view, data: data || window.__DATA,
         inputs: inputs || (view === "genome" ? { fold: window.__FOLD } : view === "cas9" ? { scan: scanFor(q.get("guide")) } : {}),
         onOpen(id) { window.__opened = id; said.textContent = "Open: " + id; },
-        onAction(name) { window.__actions.push(name); said.textContent = "Action: " + name; },
+        onAction(name, detail) { window.__actions.push(name); window.__actionDetail = detail || null; said.textContent = "Action: " + name; },
       });
     } catch (e) {
       window.__error = e.message;
