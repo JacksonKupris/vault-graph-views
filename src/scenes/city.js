@@ -15,6 +15,8 @@ const mix = (a, b, f) => new Color(a).lerp(new Color(b), f);
 export const city = cityScene({
   id: "city", name: "City", hint: "Notes as buildings: tall = relied on, lit = recent, grey = stale; town halls are maps",
   stage: { fog: [55, 170], ambient: 0.6 }, tower: "building", hall: true, cranes: true,
+  // the colour of the sky's glow at an hour of the day (night, dawn, day, dusk), and of the open ground
+  sky: h => (h < 5 || h >= 21 ? "#4f5fc4" : h < 8 ? "#f9a8d4" : h < 17 ? "#7dd3fc" : "#fb923c"), ground: "#6b8f71",
   // the sheet is multiplied by the building's colour: a pale wall takes the topic's colour, a pane stays dark, a lit window warm
   sheet: { wall: "#d9dbe3", pane: "#3d4352", lit: ["#ffd977", "#ffe9a8", "#ffc94d"] }, beacon: BEACON, beaconName: "red", stall: STALL, arc: "#ffd977",
   wall: (c, level) => (level === 0 ? mix(c, GREY, 0.72) : mix(c, "#ffffff", 0.18)),

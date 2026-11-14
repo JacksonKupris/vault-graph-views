@@ -6,7 +6,7 @@
 //   data.links     the links drawn as arcs from the picked tower (every kind but a wanted one)
 //   inputs.selected  the host's selected note
 //   onOpen(id)     a note · onAction("graph") when there are too few notes to build a city
-import { Mesh, InstancedMesh, BoxGeometry, SphereGeometry, MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineSegments, LineBasicMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace, NearestFilter, Matrix4, Color, DoubleSide } from "three";
+import { Mesh, InstancedMesh, BoxGeometry, CircleGeometry, SphereGeometry, MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineSegments, LineBasicMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace, NearestFilter, Matrix4, Color, DoubleSide } from "three";
 import { importanceOf, activityOf, staleOf, special, hash } from "../notes.js";
 import { districtsOf, gridDims, scatter, fromMiddle } from "../districts.js";
 import { plural, clip } from "../text.js";
@@ -101,6 +101,16 @@ export const cityScene = look => ({
     for (const l of data.links) if (l.kind !== "wanted" && byId.has(l.source) && byId.has(l.target)) { join(l.source, l.target); join(l.target, l.source); }
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     const m4 = new Matrix4();
+
+    // a look with a sky stands under the hour's sky on open ground that fades into its haze (kept near the theme's background, so the frame's text still reads)
+    const hour = typeof inputs.hour === "number" ? inputs.hour : new Date().getHours(), night = hour < 5 || hour >= 21;
+    const darkTheme = new Color(theme.bg).getHSL({}).l < 0.5, glow = look.sky ? look.sky(hour) : null;
+    let ground = null;
+    if (glow) {
+      stage.sky({ top: mix(theme.bg, glow, darkTheme ? 0 : 0.3), haze: mix(theme.bg, glow, darkTheme ? 0.035 : 0.1), stars: night && darkTheme ? 160 : 0 });
+      ground = add(new Mesh(new CircleGeometry(Math.max(L.bounds.x[1] - L.bounds.x[0], L.cell * 3) * 4, 48).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: mix(look.ground, theme.bg, darkTheme ? 0.94 : 0.45) })));
+      ground.position.set((L.bounds.x[0] + L.bounds.x[1]) / 2, -0.16, L.front); ground.userData.backdrop = true;
+    }
 
     // the districts' streets: a dark pad tinted with the topic's colour, and the street of stalls in front
     const pads = add(new InstancedMesh(new BoxGeometry(1, 0.1, 1), new MeshBasicMaterial(), L.pads.length));
@@ -217,8 +227,8 @@ export const cityScene = look => ({
       frame() { if (held) return; const t = (performance.now() - started) / 1000; beacons.visible = Math.sin(t * 4) > -0.3; drive(t); clearTimeout(timer); timer = setTimeout(invalidate, 33); },
       stat,
       today: () => (worst && worst[0] ? { text: `Darkest district: ${L.districts[worst[1]].name} · ${plural(worst[0], "stale note")}`, label: "Go there", run: () => goTo(worst[1]) } : null),
-      api: { layout: () => L, selected: () => selected, district: () => (only == null ? null : L.districts[only].cluster), hold() { held = true; beacons.visible = true; invalidate(); }, towers: () => T.filter(t => t.kind === "tower").length, stalls: () => stalls.length, dark: () => dark.length, halls: () => halls.length, cranes: () => cranes.length, tallest: () => (tallest ? tallest.n.id : null) },
-      dispose() { held = true; clearTimeout(timer); for (const o of [pads, street, roofs, beacons, carMesh, arcs, extras, ...parts.map(p => p.mesh)]) { if (o.material.map) o.material.map.dispose(); } },
+      api: { back: () => stage.camera.position.distanceTo(stage.centre), sky: () => (glow ? { hour, glow, stars: night && darkTheme } : null), layout: () => L, selected: () => selected, district: () => (only == null ? null : L.districts[only].cluster), hold() { held = true; beacons.visible = true; invalidate(); }, towers: () => T.filter(t => t.kind === "tower").length, stalls: () => stalls.length, dark: () => dark.length, halls: () => halls.length, cranes: () => cranes.length, tallest: () => (tallest ? tallest.n.id : null) },
+      dispose() { held = true; clearTimeout(timer); for (const o of [pads, street, ...(ground ? [ground] : []), roofs, beacons, carMesh, arcs, extras, ...parts.map(p => p.mesh)]) { if (o.material.map) o.material.map.dispose(); } },
     };
   },
 });

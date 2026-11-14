@@ -79,6 +79,7 @@ export function checkInputs(view, data, inputs) {
     if (inp.scan.ids !== undefined && !Array.isArray(inp.scan.ids)) out.push(`inputs.scan.ids should be array, is ${typeOf(inp.scan.ids)}`);
     if (!out.length && inp.scan.notes[0] && (typeof inp.scan.notes[0].path !== "string" || typeof inp.scan.notes[0].hits !== "number")) out.push("inputs.scan.notes[0] should be { path: string, hits: number }");
   }
+  if (inp.hour != null && typeof inp.hour !== "number") out.push(`inputs.hour should be number, is ${typeOf(inp.hour)}`);
   if (inp.selected != null && typeof inp.selected !== "string") out.push(`inputs.selected should be string, is ${typeOf(inp.selected)}`);
   return out;
 }

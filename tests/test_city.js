@@ -66,6 +66,20 @@ try {
 
   same("Cyberpunk mounts on the same data", await page.mount("cyberpunk", undefined, fresh), null);
   same("and has spires, no halls and no cranes", await ev(`[${A}.halls(), ${A}.cranes()]`), [0, 0]);
+  const corner = () => ev(`(async () => { const img = new Image(); img.src = ${V}.snapshot(); await img.decode(); const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const x = c.getContext("2d"); x.drawImage(img, 0, 0); return [...x.getImageData(2, 2, 1, 1).data].slice(0, 3); })()`);
+  const far = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+  same("Cyberpunk has no sky", await ev(`${A}.sky()`), null);
+  const bare = await corner(), dist = await ev(`${A}.back()`);
+
+  // the sky: its glow follows the hour, stars only at night, and the open ground is never what the camera frames
+  const sky = {};
+  for (const hour of [12, 19, 23]) { same(`City mounts at ${hour}:00`, await page.mount("city", { hour }, fresh), null); await ev(`${A}.hold()`); await page.drawn(); sky[hour] = { ...(await ev(`${A}.sky()`)), px: await corner() }; }
+  same("the sky knows its hour, and has stars only at night", [12, 19, 23].map(h => [sky[h].hour, sky[h].stars]), [[12, false], [19, false], [23, true]]);
+  ok(far(sky[12].px, bare) > 4 && far(sky[12].px, sky[19].px) > 4, `the sky is drawn, and noon's is not dusk's (${sky[12].px} · ${sky[19].px} · no sky ${bare})`);
+  ok(far(sky[12].px, bare) < 90 && far(sky[19].px, bare) < 90, `the sky stays near the theme background, so the frame text still reads (${sky[12].px} · ${sky[19].px} · no sky ${bare})`);
+  const cityDist = await ev(`${A}.back()`);
+  ok(Math.abs(cityDist - dist) < dist * 0.15, `the ground is not framed: the camera stands where it does over Cyberpunk (${cityDist.toFixed(0)} · ${dist.toFixed(0)})`);
+  await page.shot("city-night");
 
   same("two notes mount", await page.mount("city", undefined, { ...all, nodes: all.nodes.slice(0, 2), links: [] }), null);
   ok((await text(".vgv-controls")).includes("City needs notes in topics, linked to one another."), "with too few notes it says what it needs");
