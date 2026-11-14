@@ -22,6 +22,8 @@ const BREAKS = [
   { what: "the still mode is kept among the modes", file: "src/modes.js", from: "if (values[k] < 1e-9) continue;", to: "", test: "test_modes.js" },
   { what: "a click on a note of the sheet doesn't reach the host", file: "src/scenes/modes.js", from: "function open(i) { selected = i; refresh(); shape(); invalidate(); onOpen(V.ids[i]); }", to: "function open(i) { selected = i; refresh(); shape(); invalidate(); }", test: "test_modesview.js" },
   { what: "the sheet's swing stays one height however long the layout is", file: "src/scenes/modes.js", from: "Math.max(RISE, SWING * Math.max(spanX, spanZ))", to: "RISE", test: "test_depth.js" },
+  { what: "City has no sky", file: "src/scenes/cyberpunk.js", from: "stage.sky({ top:", to: "(() => {})({ top:", test: "test_city.js" },
+  { what: "the camera frames the open ground, not the city", file: "src/scenes/cyberpunk.js", from: "ground.userData.backdrop = true;", to: "", test: "test_city.js" },
   { what: "the sheet keeps ringing under a finger", file: "src/scenes/modes.js", from: "if (playing && !touching) { const now", to: "if (playing) { const now", test: "test_modesview.js" },
   { what: "a tube never grows or thins toward the flow it carried", file: "src/physarum.js", from: "D[e] = Math.max(floor, D[e] + dt * (Math.abs(Q[e]) - D[e]));", to: "D[e] = Math.max(floor, D[e]);", test: "test_physarum.js" },
   { what: "the mould ignores the vault's hub notes and is fed at its most linked notes", file: "src/physarum.js", from: 'fed = maps.length >= 2 ? "hubs" : "top"', to: 'fed = "top"', test: "test_physarum.js" },
