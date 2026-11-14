@@ -1,5 +1,5 @@
 // Every view on a phone, dragged as far down as a finger can take it: it still has depth (not a line), the camera
-// stays above the scene, and no two labels overlap. The Cas9 model is the one view that may turn all the way under.
+// stays above the scene, and no two labels overlap. A model held in the hand (Cas9, the Atom, the Station) may turn all the way under.
 //   node tests/test_depth.js [--shots dir]
 import { checks, openDev, skip } from "./kit.js";
 
@@ -19,12 +19,13 @@ const overlaps = () => ev(`(() => { const r = [...document.querySelectorAll(".vg
   return bad; })()`);
 
 try {
-  const views = await ev("VaultGraphViews.VIEWS.map(v => v.id)");
-  for (const view of views) {
+  const all = await ev("VaultGraphViews.VIEWS.map(v => ({ id: v.id, under: v.under }))");
+  same("the models that may turn all the way under", all.filter(v => v.under).map(v => v.id), ["cas9", "atom", "station"]);
+  for (const { id: view, under } of all) {
     same(`${view} mounts`, await page.mount(view), null);
     await ev("(window.__views.api.hold || (() => {}))(0.25)");
     const t = await ev("window.__views.turn({ pitch: -1.4 })");
-    if (view === "cas9") ok(t.pitch < 0, `${view}: the model can be turned under (${t.pitch})`);
+    if (under) ok(t.pitch < 0, `${view}: the model can be turned under (${t.pitch})`);
     else {
       ok(t.pitch >= 0.25, `${view}: the camera stays above the scene (pitch ${t.pitch.toFixed(2)})`);
       const s = await spread();

@@ -19,7 +19,7 @@
   window.__scanFor = scanFor;
   window.__mount = (view, inputs, data) => {
     if (window.__views) window.__views.dispose();
-    window.__views = null; window.__opened = null; window.__error = null; window.__actions.length = 0;
+    pick.value = view; window.__views = null; window.__opened = null; window.__error = null; window.__actions.length = 0;
     try {
       window.__views = V.mountViews(host, {
         view, data: data || window.__DATA,
@@ -33,13 +33,13 @@
     }
     return window.__views;
   };
-  for (const v of V.VIEWS) {
-    const b = document.createElement("button");
-    b.textContent = v.name; b.title = v.hint;
-    b.onclick = () => { history.replaceState(null, "", "?view=" + v.id + (q.get("guide") ? "&guide=" + encodeURIComponent(q.get("guide")) : "")); window.__mount(v.id); };
-    bar.appendChild(b);
-  }
-  bar.appendChild(said);
+  // one picker, not a button per view: a column of buttons grew over the view's own buttons as views were added
+  const pick = document.createElement("select"), first = q.get("view") || "bodies";
+  pick.title = "The view shown";
+  for (const v of V.VIEWS) { const o = document.createElement("option"); o.value = v.id; o.textContent = v.name; o.title = v.hint; pick.appendChild(o); }
+  pick.value = first;
+  pick.onchange = () => { history.replaceState(null, "", "?view=" + pick.value + (q.get("guide") ? "&guide=" + encodeURIComponent(q.get("guide")) : "")); window.__mount(pick.value); };
+  bar.appendChild(said); bar.appendChild(pick);
   addEventListener("resize", () => window.__views && window.__views.resize());
-  window.__mount(q.get("view") || "bodies");
+  window.__mount(first);
 })();

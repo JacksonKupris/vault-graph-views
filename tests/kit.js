@@ -73,10 +73,20 @@ export async function openDev(o = {}) {
     grid: (step = 12) => ev(`(() => { const v = window.__views, cv = document.querySelector("#host canvas"), out = [];
       for (let y = 40; y < innerHeight - 20; y += ${step}) for (let x = 20; x < innerWidth - 20; x += ${step}) if (document.elementFromPoint(x, y) === cv) out.push({ x, y, key: v.keyAt(x, y) });
       return out; })()`),
-    find: (kind, id) => ev(`(() => { const v = window.__views, cv = document.querySelector("#host canvas"), want = ${JSON.stringify(id === undefined ? null : id)};
+    // the middle of the thing as it shows on screen (the first of that kind met, or the one with that id): where a finger would
+    // land, not a pixel on its edge that a neighbour half covers
+    find: (kind, id) => ev(`(() => { const v = window.__views, cv = document.querySelector("#host canvas"), seen = new Map(), want = ${JSON.stringify(id === undefined ? null : id)};
       for (let y = 40; y < innerHeight - 20; y += 3) for (let x = 20; x < innerWidth - 20; x += 3) { const k = v.keyAt(x, y);
-        if (k && k.kind === ${JSON.stringify(kind)} && (want === null || k.id === want) && document.elementFromPoint(x, y) === cv) return { x, y, id: k.id }; }
-      return null; })()`),
+        if (k && k.kind === ${JSON.stringify(kind)} && (want === null || k.id === want) && document.elementFromPoint(x, y) === cv) { if (!seen.has(k.id)) seen.set(k.id, []); seen.get(k.id).push({ x, y }); } }
+      if (!seen.size) return null;
+      // a point with the canvas 24 px all round it (a finger's half-width): a browser sends a touch near a button to the button, so a
+      // label beside a thing takes the tap. With no id asked for, the first thing that has such a point; with none, the first met
+      const open = p => [-24, -12, 0, 12, 24].every(dx => [-24, -12, 0, 12, 24].every(dy => document.elementFromPoint(p.x + dx, p.y + dy) === cv));
+      let got = null, pts = null;
+      for (const [k, list] of seen) { const clear = list.filter(open); if (clear.length) { got = k; pts = clear; break; } }
+      if (got === null) [got, pts] = seen.entries().next().value;
+      const mx = pts.reduce((s, p) => s + p.x, 0) / pts.length, my = pts.reduce((s, p) => s + p.y, 0) / pts.length, far = p => (p.x - mx) ** 2 + (p.y - my) ** 2;
+      const p = pts.reduce((a, b) => (far(b) < far(a) ? b : a)); return { x: p.x, y: p.y, id: got }; })()`),
     // the canvas as drawn now, counted by colour: white protein, orange-red RNA, blue DNA, gold matches
     pixels: () => ev(`(async () => {
       const img = new Image(); img.src = window.__views.snapshot(); await img.decode();
