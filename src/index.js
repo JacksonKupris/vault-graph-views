@@ -20,9 +20,12 @@ import { city } from "./scenes/city.js";
 import { radar } from "./scenes/radar.js";
 import { clock } from "./scenes/clock.js";
 import { foodweb } from "./scenes/foodweb.js";
+import { atom } from "./scenes/atom.js";
+import { station } from "./scenes/station.js";
+import { reactor } from "./scenes/reactor.js";
 
-const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk, radar, clock, foodweb, city };
-export const VIEWS = Object.values(SCENES).map(s => ({ id: s.id, name: s.name, hint: s.hint, actions: s.actions || [] }));
+const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk, radar, clock, foodweb, city, atom, station, reactor };
+export const VIEWS = Object.values(SCENES).map(s => ({ id: s.id, name: s.name, hint: s.hint, actions: s.actions || [], under: (s.home.minPitch || 0) < 0 }));
 
 export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction, theme } = {}) {
   const def = SCENES[view];

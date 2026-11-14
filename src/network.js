@@ -2,14 +2,21 @@
 // largest connected set of links joins, and where a short spring layout puts them. Pure, so tests check it.
 import { special, importanceOf, hash } from "./notes.js";
 
+// Which of the vault's own notes each one is joined to by a written link, either way: own (id -> node) and adj (id -> Set of ids).
+// People and ghosts are never in it; with `hubs`, the vault's maps (`moc`) are, with the links to their members.
+export function adjacency(nodes, links, { hubs = false } = {}) {
+  const own = new Map(nodes.filter(n => !special(n) || (hubs && n.moc)).map(n => [n.id, n])), tube = hubs ? k => k === "link" || k === "moc" : k => k === "link";
+  const adj = new Map([...own.keys()].map(id => [id, new Set()]));
+  for (const l of links) if (tube(l.kind) && l.source !== l.target && adj.has(l.source) && adj.has(l.target)) { adj.get(l.source).add(l.target); adj.get(l.target).add(l.source); }
+  return { own, adj };
+}
+
 // The vault's own notes that the largest connected set of written links joins, at most `max` of the most important ones,
 // most important first. bars are pairs of indexes into ids; own maps an id to its node; imp scores a node 0 to 1.
 // With `hubs` (a number), the vault's hub notes (its maps, `moc`) join in with the links to their members, the `hubs`
 // with most members first in `ids`; without it they stay out, as people and ghosts always do.
 export function joinedNotes(nodes, links, { max = 120, hubs = 0 } = {}) {
-  const imp = importanceOf(nodes), own = new Map(nodes.filter(n => !special(n) || (hubs && n.moc)).map(n => [n.id, n])), tube = hubs ? k => k === "link" || k === "moc" : k => k === "link";
-  const adj = new Map([...own.keys()].map(id => [id, new Set()]));
-  for (const l of links) if (tube(l.kind) && l.source !== l.target && adj.has(l.source) && adj.has(l.target)) { adj.get(l.source).add(l.target); adj.get(l.target).add(l.source); }
+  const imp = importanceOf(nodes), { own, adj } = adjacency(nodes, links, { hubs: !!hubs });
   const seen = new Set(); let best = [];
   for (const id of [...adj.keys()].sort()) {
     if (seen.has(id) || !adj.get(id).size) continue;
