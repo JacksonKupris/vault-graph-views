@@ -33,6 +33,16 @@ try {
     same(`${view}: no labels overlap`, await overlaps(), []);
     await page.shot("depth-" + view);
   }
+  // a long, thin vault (three chains of notes joined end to end): the camera backs off to fit it, and the sheet's swing must still be seen
+  const N = id => ({ id, name: id, folder: "Chain", broken: 0, refs: 0, cluster: 0, inlinks: 1, outlinks: 1, mentions: 0, bc: 0, recent: 0, words: 100, age: 1, tasks: 0, isolated: false });
+  const chain = Array.from({ length: 36 }, (_, i) => N("n" + i));
+  const thin = { nodes: chain, links: chain.slice(1).map((n, i) => ({ source: "n" + i, target: n.id, w: 1, kind: "link" })), clusters: [{ id: 0, name: "Chain", label: "Chain", size: 36 }], wanted: [], quality: { stale_days: 180 } };
+  same("modes mounts on a long, thin vault", await page.mount("modes", undefined, thin), null);
+  await ev("window.__views.api.hold(0.25)"); await ev("window.__views.turn({ pitch: -1.4 })");
+  const [long, rise] = await ev("[window.__views.api.span(), window.__views.api.rise()]"), deep = await spread();
+  ok(long > 40, `the thin vault's layout is long (${long.toFixed(0)} across)`);
+  ok(rise > 6 && deep > 0.12, `modes on a long, thin vault: the swing grows with the layout (${rise.toFixed(1)}) and still has depth (${Math.round(deep * 100)}% of the page tall)`);
+  await page.shot("depth-modes-thin");
   same("no errors in the page", await page.errors(), []);
 } catch (e) {
   ok(false, "the test itself failed: " + e.message);

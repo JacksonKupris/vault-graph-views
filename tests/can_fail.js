@@ -21,6 +21,7 @@ const BREAKS = [
   { what: "the Laplacian counts a link once instead of in both notes", file: "src/modes.js", from: "L[i][i]++; L[j][j]++;", to: "L[i][i]++;", test: "test_modes.js" },
   { what: "the still mode is kept among the modes", file: "src/modes.js", from: "if (values[k] < 1e-9) continue;", to: "", test: "test_modes.js" },
   { what: "a click on a note of the sheet doesn't reach the host", file: "src/scenes/modes.js", from: "function open(i) { selected = i; refresh(); shape(); invalidate(); onOpen(V.ids[i]); }", to: "function open(i) { selected = i; refresh(); shape(); invalidate(); }", test: "test_modesview.js" },
+  { what: "the sheet's swing stays one height however long the layout is", file: "src/scenes/modes.js", from: "Math.max(RISE, SWING * Math.max(spanX, spanZ))", to: "RISE", test: "test_depth.js" },
   { what: "the sheet keeps ringing under a finger", file: "src/scenes/modes.js", from: "if (playing && !touching) { const now", to: "if (playing) { const now", test: "test_modesview.js" },
   { what: "a tube never grows or thins toward the flow it carried", file: "src/physarum.js", from: "D[e] = Math.max(floor, D[e] + dt * (Math.abs(Q[e]) - D[e]));", to: "D[e] = Math.max(floor, D[e]);", test: "test_physarum.js" },
   { what: "the mould ignores the vault's hub notes and is fed at its most linked notes", file: "src/physarum.js", from: 'fed = maps.length >= 2 ? "hubs" : "top"', to: 'fed = "top"', test: "test_physarum.js" },
