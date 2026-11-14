@@ -9,7 +9,7 @@ import { modeInsights } from "../insights.js";
 import { plural, clip } from "../text.js";
 import { vaultModes, halves } from "../modes.js";
 
-export const UP = "#f59e0b", DOWN = "#38bdf8", RISE = 6, GRID = 44;
+export const UP = "#f59e0b", DOWN = "#38bdf8", RISE = 6, SWING = 0.18, GRID = 44;
 
 export const modes = {
   id: "modes", name: "Normal modes", hint: "How the vault would ring: its natural cuts into halves",
@@ -29,6 +29,8 @@ export const modes = {
     const xs = V.pos.map(p => p[0]), zs = V.pos.map(p => p[1]), pad = 2, x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, z0 = Math.min(...zs) - pad, z1 = Math.max(...zs) + pad;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, spanX = x1 - x0, spanZ = z1 - z0;
     const place = i => [V.pos[i][0] - cx, V.pos[i][1] - cz];
+    // the camera backs off to fit a long layout, so a fixed swing would look flat from there (a phone, a thin vault): it grows with the long side
+    const rise = Math.max(RISE, SWING * Math.max(spanX, spanZ));
 
     // the sheet: a grid whose height at each point is the mode's swing there, blended from the notes round it (nearer counts more)
     const sheet = new PlaneGeometry(spanX, spanZ, GRID, GRID).rotateX(-Math.PI / 2), vcount = sheet.attributes.position.count;
@@ -90,10 +92,10 @@ export const modes = {
     function refresh() { labels(); frame.stat(stat()); }
     function shape() {   // what depends on the time: heights
       const v = mode().vector, s = sway(), pos = sheet.attributes.position;
-      for (let g = 0; g < vcount; g++) { let h = 0; for (let i = 0; i < n; i++) h += W[g * n + i] * v[i]; pos.setY(g, h * RISE * s); }
+      for (let g = 0; g < vcount; g++) { let h = 0; for (let i = 0; i < n; i++) h += W[g * n + i] * v[i]; pos.setY(g, h * rise * s); }
       pos.needsUpdate = true; sheet.computeVertexNormals();
       const sp = springs.attributes.position;
-      for (let i = 0; i < n; i++) height[i] = v[i] * RISE * s;
+      for (let i = 0; i < n; i++) height[i] = v[i] * rise * s;
       V.bars.forEach(([i, j], b) => { const [ax, az] = place(i), [bx, bz] = place(j); sp.setXYZ(2 * b, ax, height[i] + 0.05, az); sp.setXYZ(2 * b + 1, bx, height[j] + 0.05, bz); });
       sp.needsUpdate = true;
       for (let i = 0; i < n; i++) {
@@ -122,7 +124,7 @@ export const modes = {
       today: () => { const h = halves(V.modes[0].vector); return { text: `The vault's cleanest cut is ${h.up.length} notes against ${h.down.length}`, label: "Show it", run: () => { selected = null; setMode(0); } }; },
       api: {
         modes: () => V.modes, ids: () => V.ids, mode: () => k, setMode, playing: () => playing, moving: () => playing && !touching, hold(p) { playing = false; if (p != null) phase = p; shape(); controls(); invalidate(); },
-        selected: () => (selected == null ? null : V.ids[selected]), heights: () => Array.from(height), sheetHeights: () => Array.from(sheet.attributes.position.array.filter((_, i) => i % 3 === 1)), split,
+        span: () => Math.max(spanX, spanZ), rise: () => rise, selected: () => (selected == null ? null : V.ids[selected]), heights: () => Array.from(height), sheetHeights: () => Array.from(sheet.attributes.position.array.filter((_, i) => i % 3 === 1)), split,
       },
       dispose() { clearTimeout(settle); stage.canvas.removeEventListener("pointerdown", down_, true); removeEventListener("pointerup", up_); removeEventListener("pointercancel", up_); for (const o of [skin, mesh, beads, wire]) o.material.dispose(); sheet.dispose(); springs.dispose(); },
     };
