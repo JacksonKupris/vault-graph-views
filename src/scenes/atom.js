@@ -4,7 +4,7 @@
 //   data.nodes[]     cluster, and what importance needs · data.links  the written links (kind "link")
 //   inputs.selected  the host's selected note: the nucleus, when it has links
 //   onOpen(id) a note · onAction("graph") when no notes link to one another
-import { Mesh, Group, SphereGeometry, TorusGeometry, MeshPhongMaterial, MeshBasicMaterial, Vector3, Euler } from "three";
+import { Mesh, Group, SphereGeometry, TorusGeometry, MeshPhongMaterial, MeshBasicMaterial, Vector3, Euler, AdditiveBlending, BackSide } from "three";
 import { adjacency } from "../network.js";
 import { importanceOf } from "../notes.js";
 import { copies, mix, scrap } from "../models/parts.js";
@@ -59,7 +59,7 @@ const AWAY = ["one link away", "two links away", "three links away"];
 
 export const atom = {
   id: "atom", name: "Atom", hint: "One note as an atom: its links are the nucleus, the notes one, two and three links away its shells",
-  home: { yaw: 0.25, pitch: 0.2, dist: 46, min: 12, max: 160, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 240], ambient: 0.55 },
+  home: { yaw: 0.25, pitch: 0.2, dist: 33, min: 10, max: 160, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 240], ambient: 0.55 },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     let L = atomLayout(data, inputs.selected), model = null;
@@ -72,15 +72,18 @@ export const atom = {
       model = new Group();
       const ball = () => new SphereGeometry(1, 24, 16);
       model.add(copies(ball(), shiny(), L.nucleus, (p, i, m) => { m.makeScale(BALL, BALL, BALL).setPosition(...p.at); return p.proton ? PROTON : NEUTRON; }));
+      // a soft glow round the nucleus, so it reads as the heart of the atom
+      for (const [f, o] of [[1.35, 0.16], [1.9, 0.07]]) { const g = new Mesh(new SphereGeometry(L.nucleusR * f, 32, 16), new MeshBasicMaterial({ color: NEUTRON, transparent: true, opacity: o, blending: AdditiveBlending, depthWrite: false, side: BackSide })); model.add(g); }
       L.shells.forEach((s, k) => {
-        const ring = new Mesh(new TorusGeometry(RADII[k], 0.1, 8, 120), new MeshBasicMaterial({ color: mix(theme.muted, theme.fg, 0.3), transparent: true, opacity: s.ids.length ? 0.75 : 0.3 }));
+        // the inner shell is the boldest and the outer the faintest, a ring in the topic-neutral blue-grey
+        const ring = new Mesh(new TorusGeometry(RADII[k], 0.16 - 0.04 * k, 8, 160), new MeshBasicMaterial({ color: mix(NEUTRON, theme.fg, 0.35 + 0.15 * k), transparent: true, opacity: s.ids.length ? 0.85 - 0.2 * k : 0.25 }));
         ring.rotation.set(...TILT[k]); model.add(ring);
       });
       model.add(copies(ball(), shiny(), L.electrons, (e, i, m) => { m.makeScale(e.r, e.r, e.r).setPosition(...e.at); return colour(e.id); }));
       stage.scene.add(model);
       const labels = [{ text: clip(name(L.centre), 34), at: [0, L.nucleusR, 0], strong: true, dy: -18, run: () => onOpen(L.centre), title: `Open ${name(L.centre)}` }];
       L.shells.forEach((s, k) => { if (s.ids.length) labels.push({ text: `${AWAY[k]} (${s.ids.length < s.all ? `${s.ids.length} of ${s.all}` : s.all})`, at: L.gaps[k], color: theme.muted, dy: 14 }); });
-      for (const e of L.electrons) if (e.shell === 0) labels.push({ text: clip(name(e.id), 22), at: e.at, dy: -16, run: () => pick(e.id), title: `Open ${name(e.id)}` });
+      for (const e of L.electrons.filter(e => e.shell === 0).slice(0, 4)) labels.push({ text: clip(name(e.id), 22), at: e.at, dy: -16, run: () => pick(e.id), title: `Open ${name(e.id)}` });
       frame.labels(labels); frame.stat(stat());
       const loose = L.unreached[0], out = [];
       out.push({ text: `${L.within} of ${plural(L.linked - 1, "other linked note")} are within three links of ${name(L.centre)}.${L.far.d > 3 ? ` The farthest, ${name(L.far.id)}, is ${L.far.d} links away.` : ""}`, ...(L.far.d > 3 ? { label: "Open farthest", run: () => pick(L.far.id) } : {}) });

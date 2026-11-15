@@ -63,11 +63,13 @@ export const reactor = {
       const wall = (r, h) => new CylinderGeometry(r, r, h, 64, 1, true, YAW + CUT / 2, Math.PI * 2 - CUT), cap = (r, up) => new SphereGeometry(r, 64, 20, YAW + CUT / 2 + Math.PI / 2, Math.PI * 2 - CUT, up ? 0 : Math.PI / 2, Math.PI / 2);
       // the hall: a slab, a concrete wall and dome with a quarter cut away
       lay(new CylinderGeometry(19, 19, 1, 64), phong(concrete), -5.5);
-      lay(wall(18, 17), phong(concrete, { side: DoubleSide }), 3.5); lay(cap(18, true), phong(concrete, { side: DoubleSide }), 12).scale.y = 0.6;
+      // the hall is see-through glass-grey, so the vessel inside shows
+      const hall = { side: DoubleSide, transparent: true, opacity: 0.42, depthWrite: false };
+      lay(wall(18, 17), phong(concrete, hall), 3.5); lay(cap(18, true), phong(concrete, hall), 12).scale.y = 0.6;
       // the vessel: a steel wall and bottom with the same cut, the water in it, the plate the control rods hang from
       lay(wall(6.2, 12), phong(steel, { side: DoubleSide }), 3); lay(cap(6.2, false), phong(steel, { side: DoubleSide }), -3).scale.y = 0.5; lay(cap(6.2, true), phong(steel, { side: DoubleSide }), 9).scale.y = 0.5;
       lay(new CylinderGeometry(5.9, 5.9, 0.3, 48), phong(dark), -0.2); lay(new CylinderGeometry(5.9, 5.9, 0.3, 48), phong(dark), TOP);
-      lay(new CylinderGeometry(5.8, 5.8, TOP, 48, 1, false, YAW + CUT / 2, Math.PI * 2 - CUT), new MeshPhongMaterial({ color: "#38bdf8", transparent: true, opacity: 0.08, depthWrite: false, side: DoubleSide }), TOP / 2);
+      lay(new CylinderGeometry(5.8, 5.8, TOP, 48, 1, false, YAW + CUT / 2, Math.PI * 2 - CUT), new MeshPhongMaterial({ color: "#38bdf8", transparent: true, opacity: 0.2, depthWrite: false, side: DoubleSide }), TOP / 2);
       const rod = n => new CylinderGeometry(1, 1, 1, n);
       model.add(copies(rod(12), new MeshPhongMaterial({ color: "#ffffff", shininess: 70 }), L.fuel, (f, i, m) => { span(m, [f.at[0], 0, f.at[1]], [f.at[0], f.h, f.at[1]], 0.42); return mix(mix(dark, colour(f.cluster), 0.5 + 0.5 * f.heat), theme.bg, dim(f.cluster)); }));
       model.add(copies(rod(8), phong("#ffffff"), L.control, (c, i, m) => { const low = TOP - ROD * c.depth; span(m, [c.at[0], low, c.at[1]], [c.at[0], low + ROD + 1.4, c.at[1]], 0.2); return mix(dark, theme.bg, dim(c.cluster)); }));

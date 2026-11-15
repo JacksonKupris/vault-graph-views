@@ -59,14 +59,15 @@ export const station = {
       lay(new CylinderGeometry(1.5, 1.5, 7, 28), metal(hull), [0, 0, 0], [Math.PI / 2, 0, 0]);
       lay(new SphereGeometry(1.5, 28, 16), metal(topic), [0, 0, 3.5]); lay(new SphereGeometry(1.5, 28, 16), metal(hull), [0, 0, -3.5]);
       lay(new CylinderGeometry(0.22, 0.22, 16, 10), metal(hull), [0, 0, 0], [Math.PI / 2, 0, 0]);
-      for (const z of [7.2, -7.2]) { lay(new CylinderGeometry(0.12, 0.12, 13, 8), metal(hull), [0, 0, z], [0, 0, Math.PI / 2]); for (const x of [4, -4]) lay(new BoxGeometry(5, 2.6, 0.08), new MeshPhongMaterial({ color: "#1d4ed8", specular: "#93c5fd", shininess: 90 }), [x, 0, z]); }
+      for (const z of [7.2, -7.2]) { lay(new CylinderGeometry(0.12, 0.12, 13, 8), metal(hull), [0, 0, z], [0, 0, Math.PI / 2]); for (const x of [4, -4]) lay(new BoxGeometry(5, 2.6, 0.08), new MeshPhongMaterial({ color: "#1e3a8a", emissive: "#0b1a45", specular: "#93c5fd", shininess: 90 }), [x, 0, z]); }
       // the two rings, their modules, the spokes and the struts
       for (const z of [GAP, -GAP]) lay(new TorusGeometry(RING, 0.16, 8, 96), metal(hull), [0, 0, z]);
       const v = new Vector3(), box = (m, mat) => mat.makeRotationZ(m.a).scale(v.set(0.85 * m.size, 1.15 * m.size, 1.1 * m.size)).setPosition(...m.at);
       model.add(copies(new BoxGeometry(1, 1, 1), metal("#ffffff"), [...L.docked, ...L.second], (m, i, mat) => { box(m, mat); return tint(m); }));
       const at = new Map(L.docked.map(m => [m.id, m.at])), rod = () => new CylinderGeometry(1, 1, 1, 6);
-      model.add(copies(rod(), metal(hull), L.docked, (m, i, mat) => { span(mat, [0, 0, GAP], m.at, 0.05); }));
-      model.add(copies(rod(), metal(hull), L.second.filter(m => m.anchor), (m, i, mat) => { span(mat, m.at, at.get(m.anchor), 0.05); }));
+      const faint = () => new MeshPhongMaterial({ color: hull, transparent: true, opacity: 0.35, depthWrite: false });   // links are drawn light so they read behind the model
+      model.add(copies(rod(), faint(), L.docked, (m, i, mat) => { span(mat, [0, 0, GAP], m.at, 0.05); }));
+      model.add(copies(rod(), faint(), L.second.filter(m => m.anchor), (m, i, mat) => { span(mat, m.at, at.get(m.anchor), 0.05); }));
       model.add(copies(new IcosahedronGeometry(1, 0), new MeshPhongMaterial({ color: "#ffffff", flatShading: true }), L.adrift, (m, i, mat) => { mat.makeRotationZ(i).scale(v.set(0.6 * m.size, 0.45 * m.size, 0.5 * m.size)).setPosition(...m.at); return m.state === "stale" ? grey : mix(topic, grey, 0.6); }));
       stage.scene.add(model);
       const open = m => ({ run: () => onOpen(m.id), title: `Open ${name(m.id)}` });
