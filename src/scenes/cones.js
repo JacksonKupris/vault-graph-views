@@ -6,7 +6,8 @@
 //   data.links          the written links (kind "link"); similar, gap, person and map links don't carry cause
 //   inputs.selected     the host's selected note
 //   onOpen(id)          a note
-import { InstancedMesh, SphereGeometry, ConeGeometry, Mesh, MeshStandardMaterial, MeshBasicMaterial, LineSegments, LineBasicMaterial, BufferGeometry, Float32BufferAttribute, Matrix4, Color, DoubleSide } from "three";
+import { InstancedMesh, SphereGeometry, ConeGeometry, Mesh, MeshStandardMaterial, MeshBasicMaterial, LineSegments, LineBasicMaterial, LineLoop, BufferGeometry, Float32BufferAttribute, Matrix4, Color, DoubleSide, AdditiveBlending } from "three";
+import { sparks } from "../models/parts.js";
 import { importanceOf, special, hash } from "../notes.js";
 import { plural, clip, dayLabel, daysApart } from "../text.js";
 
@@ -55,7 +56,7 @@ const isoOf = day => new Date(day * DAY).toISOString().slice(0, 10);
 
 export const cones = {
   id: "cones", name: "Light cones", hint: "What a note rested on and what it touched",
-  home: { yaw: 0.7, pitch: 0.2, dist: 52, min: 14, max: 120 }, stage: { fog: [40, 95] },
+  home: { yaw: 0.7, pitch: 0.2, dist: 52, min: 14, max: 120 }, stage: { light: "camera", fog: [60, 150], ambient: 0.6, glow: { strength: 0.6, radius: 0.5, threshold: 0.8 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const G = causalGraph(data.nodes, data.links), ids = [...G.day.keys()];
@@ -74,6 +75,16 @@ export const cones = {
     for (const [b, list] of G.older) for (const a of list) pts.push(...L.pos.get(a), ...L.pos.get(b));
     const lines = add(new LineSegments(new BufferGeometry().setAttribute("position", new Float32BufferAttribute(pts, 3)), new LineBasicMaterial({ color: theme.muted, transparent: true, opacity: 0.22 })));
     add(new LineSegments(new BufferGeometry().setAttribute("position", new Float32BufferAttribute([...L.axis[0], ...L.axis[1]], 3)), new LineBasicMaterial({ color: theme.muted, transparent: true, opacity: 0.6 })));
+    // a spacetime diagram has a clock: a faint ring of light at a regular step (a week, a month, a quarter, by the span), wider than the notes, so height reads as time
+    const step = [7, 14, 30, 91, 182, 365, 730].find(d => (L.to - L.from) / d <= 14) || 730, weeks = Math.floor((L.to - L.from) / step);
+    for (let w = 0; w <= weeks; w++) {
+      const y = ((w * step) / Math.max(L.to - L.from, 1) - 0.5) * SIZE * 1.6, ring = [];
+      for (let i = 0; i < 96; i++) ring.push(Math.cos(i / 96 * Math.PI * 2) * SIZE * 1.05, y, Math.sin(i / 96 * Math.PI * 2) * SIZE * 1.05);
+      add(new LineLoop(new BufferGeometry().setAttribute("position", new Float32BufferAttribute(ring, 3)), new LineBasicMaterial({ color: PAST, transparent: true, opacity: 0.3, blending: AdditiveBlending, depthWrite: false })));
+    }
+    // dust of light drifting up the axis, the direction time runs
+    const dust = sparks(90, (i, t) => [Math.cos(i * 2.4) * 0.5, ((i / 90 + t * 0.03) % 1 - 0.5) * SIZE * 1.6, Math.sin(i * 2.4) * 0.5], { color: "#9cc4ff", size: 4, opacity: 0.8 }); add(dust.object);
+    stage.sky({ top: "#03050b", haze: "#0b1020" });
     const coneMat = c => new MeshBasicMaterial({ color: c, transparent: true, opacity: 0.1, side: DoubleSide, depthWrite: false });
     const pastCone = add(new Mesh(new ConeGeometry(1, 1, 40, 1, true), coneMat(PAST))), futureCone = add(new Mesh(new ConeGeometry(1, 1, 40, 1, true), coneMat(FUTURE)));
     pastCone.visible = futureCone.visible = false;
@@ -116,6 +127,7 @@ export const cones = {
     paint();
     return {
       targets: () => targets,
+      tick(t) { dust.tick(t); },
       click(k) { if (k.kind === "note") open(k.id); },
       hover(k) { const h = k && k.kind === "note" ? k.id : null; if (h !== hovered) { hovered = h; paint(); } },
       update(next) { if ("selected" in next) { selected = next.selected && L.pos.has(next.selected) ? next.selected : null; paint(); } },
