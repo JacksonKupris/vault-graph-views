@@ -5,7 +5,7 @@
 //   data.nodes[], data.clusters[], data.links (kinds "link" and "moc")
 //   inputs.selected  the host's selected note: the station shown is that note's topic
 //   onOpen(id) a note · onAction("graph") when the vault has no notes of its own
-import { Mesh, Group, BoxGeometry, CylinderGeometry, SphereGeometry, TorusGeometry, IcosahedronGeometry, MeshPhongMaterial, Vector3 } from "three";
+import { Mesh, Group, BoxGeometry, CylinderGeometry, SphereGeometry, TorusGeometry, IcosahedronGeometry, MeshPhongMaterial, MeshBasicMaterial, Vector3, Matrix4, Quaternion, DoubleSide } from "three";
 import { adjacency } from "../network.js";
 import { districtsOf, scatter } from "../districts.js";
 import { importanceOf, activityOf, staleOf, hash } from "../notes.js";
@@ -41,7 +41,7 @@ export function stationLayout(data, cluster) {
 
 export const station = {
   id: "station", name: "Station", hint: "One topic as a ring station: notes its map links are docked, the rest ride the second ring or drift outside",
-  drift: 0.06, home: { yaw: 0.65, pitch: 0.28, dist: 50, min: 12, max: 170, minPitch: -1.4 }, stage: { light: "camera", fog: [80, 260], ambient: 0.5, glow: { strength: 0.8, radius: 0.6, threshold: 0.55 } },
+  drift: 0.06, home: { yaw: 0.65, pitch: 0.28, dist: 50, min: 12, max: 170, minPitch: -1.4 }, stage: { light: "camera", fog: [80, 260], ambient: 0.5, glow: { strength: 0.8, radius: 0.6, threshold: 0.78 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const byId = new Map(data.nodes.map(n => [n.id, n])), topicOf = id => (byId.has(id) ? byId.get(id).cluster : undefined);
@@ -52,23 +52,58 @@ export const station = {
     function draw() {
       if (model) scrap(stage.scene, model);
       model = new Group();
-      const topic = theme.palette[(L.cluster || 0) % theme.palette.length], grey = mix(theme.muted, theme.bg, 0.25), hull = mix(theme.muted, theme.fg, 0.55);
+      const topic = theme.palette[(L.cluster || 0) % theme.palette.length], grey = mix(theme.muted, theme.bg, 0.25), hull = mix(theme.muted, theme.fg, 0.3);
       const tint = m => (m.state === "stale" ? grey : m.state === "active" ? ACTIVE : topic), metal = c => new MeshPhongMaterial({ color: c, specular: "#888888", shininess: 40 });
       const lay = (geo, mat, at, turn) => { const o = new Mesh(geo, mat); o.position.set(...at); if (turn) o.rotation.set(...turn); model.add(o); return o; };
-      // the hub, its mast and the four solar panels
+      // the hub: a ribbed core with flanges where the rings meet it, a mast with a dish and four gridded solar panels
+      const hullDark = mix(hull, "#000000", 0.45), accent = mix(topic, "#ffffff", 0.1), plain = new Vector3(), qq = new Quaternion(), loc = new Matrix4();
+      const put = (geo, mat, items, each) => model.add(copies(geo, mat, items, each));
       lay(new CylinderGeometry(1.5, 1.5, 7, 28), metal(hull), [0, 0, 0], [Math.PI / 2, 0, 0]);
-      lay(new SphereGeometry(1.5, 28, 16), metal(topic), [0, 0, 3.5]); lay(new SphereGeometry(1.5, 28, 16), metal(hull), [0, 0, -3.5]);
+      lay(new SphereGeometry(1.5, 28, 16), metal(topic), [0, 0, 3.5]); lay(new SphereGeometry(1.5, 28, 16), metal(hullDark), [0, 0, -3.5]);
       lay(new CylinderGeometry(0.22, 0.22, 16, 10), metal(hull), [0, 0, 0], [Math.PI / 2, 0, 0]);
-      for (const z of [7.2, -7.2]) { lay(new CylinderGeometry(0.12, 0.12, 13, 8), metal(hull), [0, 0, z], [0, 0, Math.PI / 2]); for (const x of [4, -4]) lay(new BoxGeometry(5, 2.6, 0.08), new MeshPhongMaterial({ color: "#1e3a8a", emissive: "#0b1a45", specular: "#93c5fd", shininess: 90 }), [x, 0, z]); }
-      // the two rings, their modules, the spokes and the struts
-      for (const z of [GAP, -GAP]) lay(new TorusGeometry(RING, 0.16, 8, 96), metal(hull), [0, 0, z]);
-      const v = new Vector3(), box = (m, mat) => mat.makeRotationZ(m.a).scale(v.set(0.85 * m.size, 1.15 * m.size, 1.1 * m.size)).setPosition(...m.at);
-      model.add(copies(new BoxGeometry(1, 1, 1), metal("#ffffff"), [...L.docked, ...L.second], (m, i, mat) => { box(m, mat); return tint(m); }));
+      for (const z of [-2.7, -0.9, 0.9, 2.7]) lay(new TorusGeometry(1.56, 0.07, 6, 40), metal(hullDark), [0, 0, z]);
+      for (const z of [GAP, -GAP]) { lay(new CylinderGeometry(2.1, 2.1, 0.22, 36), metal(hullDark), [0, 0, z], [Math.PI / 2, 0, 0]); lay(new TorusGeometry(2.1, 0.06, 6, 48), new MeshPhongMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }), [0, 0, z + (z > 0 ? 0.12 : -0.12)]); }
+      // thrusters round the aft sphere and a dish on the mast tip
+      put(new CylinderGeometry(0.16, 0.26, 0.5, 8), metal(hullDark), Array.from({ length: 6 }, (_, i) => i), (i, k, m) => m.makeRotationZ((i / 6) * Math.PI * 2).multiply(loc.makeTranslation(1.05, 0, -4.8)).multiply(loc.makeRotationX(Math.PI / 2)));
+      const dishGeo = new SphereGeometry(1.5, 24, 8, 0, Math.PI * 2, 0, 0.8); dishGeo.rotateX(-Math.PI / 2);
+      lay(dishGeo, new MeshPhongMaterial({ color: "#d9e2f2", specular: "#ffffff", shininess: 70, side: DoubleSide }), [0, 0, 8.4]); lay(new CylinderGeometry(0.05, 0.05, 1.2, 6), metal(hull), [0, 0, 8.7], [Math.PI / 2, 0, 0]);
+      const panelMat = new MeshPhongMaterial({ color: "#1e3a8a", emissive: "#0b1a45", specular: "#93c5fd", shininess: 90 }), bars = [];
+      for (const z of [7.2, -7.2]) { lay(new CylinderGeometry(0.12, 0.12, 13, 8), metal(hull), [0, 0, z], [0, 0, Math.PI / 2]); for (const x of [4, -4]) {
+        lay(new BoxGeometry(5, 2.6, 0.08), panelMat, [x, 0, z]);
+        for (let k = -2; k <= 2; k++) bars.push({ at: [x + k * 0.83, 0, z + 0.06], sc: [0.04, 2.6, 0.05] });
+        for (const y of [-0.86, 0.86, 1.3, -1.3]) bars.push({ at: [x, y, z + 0.06], sc: [5, 0.04, 0.05] });
+      } }
+      put(new BoxGeometry(1, 1, 1), metal("#ffffff"), bars, (b, i, m) => { m.compose(plain.set(...b.at), qq.identity(), new Vector3(...b.sc)); return "#6f84ad"; });
+      // the two rings: a main tube, two side rails, ribs between them, an inner habitat skin, and ties that hold the rings together
+      for (const z of [GAP, -GAP]) {
+        lay(new TorusGeometry(RING, 0.16, 8, 96), metal(hull), [0, 0, z]);
+        for (const dz of [0.55, -0.55]) lay(new TorusGeometry(RING - 0.15, 0.05, 6, 96), metal(hullDark), [0, 0, z + dz]);
+        const skin = lay(new CylinderGeometry(RING - 0.8, RING - 0.8, 0.9, 96, 1, true), new MeshPhongMaterial({ color: hullDark, specular: "#555555", shininess: 30, side: DoubleSide }), [0, 0, z], [Math.PI / 2, 0, 0]); skin.material.transparent = true; skin.material.opacity = 0.85;
+      }
+      const ribs = Array.from({ length: 96 }, (_, i) => ({ a: (i / 96) * Math.PI * 2, z: i % 2 ? GAP : -GAP }));
+      put(new BoxGeometry(1, 1, 1), metal("#ffffff"), ribs, (r, i, m) => { m.makeRotationZ(r.a).setPosition(RING * Math.cos(r.a), RING * Math.sin(r.a), r.z).multiply(loc.makeScale(0.12, 0.12, 1.15)); return hullDark; });
+      const ties = Array.from({ length: 12 }, (_, i) => (i / 12) * Math.PI * 2);
+      put(new BoxGeometry(1, 1, 1), metal("#ffffff"), ties, (a, i, m) => { m.makeRotationZ(a).setPosition((RING - 0.8) * Math.cos(a), (RING - 0.8) * Math.sin(a), 0).multiply(loc.makeScale(0.28, 0.28, GAP * 2 + 0.6)); return hull; });
+      // the modules: a body, a docking collar facing the hub, an antenna, a radiator fin and a lit window strip, all stood on the ring
+      const mods = [...L.docked, ...L.second], v = new Vector3(), stand = (m, mat, off, sc) => mat.makeRotationZ(m.a).setPosition(...m.at).multiply(loc.compose(plain.set(off[0], off[1], off[2]), qq.identity(), v.set(sc[0], sc[1], sc[2])));
+      const xAxis = geo => geo.rotateZ(Math.PI / 2);
+      put(new BoxGeometry(1, 1, 1), metal("#ffffff"), mods, (m, i, mat) => { stand(m, mat, [0, 0, 0], [0.85 * m.size, 1.15 * m.size, 1.1 * m.size]); return tint(m); });
+      put(xAxis(new CylinderGeometry(0.34, 0.42, 1, 10)), metal("#ffffff"), mods, (m, i, mat) => { stand(m, mat, [-0.42 * m.size - 0.3, 0, 0], [0.6, m.size, m.size]); return hullDark; });
+      put(xAxis(new CylinderGeometry(0.03, 0.03, 1, 5)), metal("#ffffff"), mods, (m, i, mat) => { stand(m, mat, [0.42 * m.size + 0.5 + (i % 3) * 0.25, 0, 0.2], [1 + (i % 3) * 0.5, 1, 1]); return "#8a96ad"; });
+      put(new BoxGeometry(1, 1, 1), metal("#ffffff"), mods, (m, i, mat) => { stand(m, mat, [0, 0, Math.sign(m.at[2]) * (0.55 * m.size + 0.5)], [0.7 * m.size, 1.0 * m.size, 0.04]); return mix(tint(m), "#000000", 0.35); });
+      put(new BoxGeometry(1, 1, 1), new MeshBasicMaterial(), mods, (m, i, mat) => { stand(m, mat, [0.43 * m.size, 0, 0], [0.03, 0.85 * m.size, 0.14 * m.size]); return m.state === "stale" ? "#3a3f4c" : "#c9a05a"; });
       const at = new Map(L.docked.map(m => [m.id, m.at])), rod = () => new CylinderGeometry(1, 1, 1, 6);
       const faint = () => new MeshPhongMaterial({ color: hull, transparent: true, opacity: 0.35, depthWrite: false });   // links are drawn light so they read behind the model
       model.add(copies(rod(), faint(), L.docked, (m, i, mat) => { span(mat, [0, 0, GAP], m.at, 0.05); }));
       model.add(copies(rod(), faint(), L.second.filter(m => m.anchor), (m, i, mat) => { span(mat, m.at, at.get(m.anchor), 0.05); }));
-      model.add(copies(new IcosahedronGeometry(1, 0), new MeshPhongMaterial({ color: "#ffffff", flatShading: true }), L.adrift, (m, i, mat) => { mat.makeRotationZ(i).scale(v.set(0.6 * m.size, 0.45 * m.size, 0.5 * m.size)).setPosition(...m.at); return m.state === "stale" ? grey : mix(topic, grey, 0.6); }));
+      // rocks: lumpy, not smooth (the bumps come from the position, so a shared corner stays shared)
+      const rockGeo = new IcosahedronGeometry(1, 1), rp = rockGeo.getAttribute("position");
+      for (let i = 0; i < rp.count; i++) { const x = rp.getX(i), y = rp.getY(i), z = rp.getZ(i), k = 1 + 0.28 * Math.sin(x * 4.1 + y * 2.3) * Math.cos(z * 3.7 + x * 1.9) + 0.12 * Math.sin(y * 9 + z * 7); rp.setXYZ(i, x * k, y * k, z * k); }
+      rockGeo.computeVertexNormals();
+      model.add(copies(rockGeo, new MeshPhongMaterial({ color: "#ffffff", flatShading: true, shininess: 6 }), L.adrift, (m, i, mat) => { mat.makeRotationZ(i).scale(v.set(0.6 * m.size, 0.45 * m.size, 0.5 * m.size)).setPosition(...m.at); return m.state === "stale" ? grey : mix(topic, grey, 0.6); }));
+      // beacons on the panel tips and the mast
+      const beacons = [[8.7, 0, 7.2], [-8.7, 0, 7.2], [8.7, 0, -7.2], [-8.7, 0, -7.2], [0, 0, 9], [0, 0, -9]];
+      model.add(sparks(beacons.length, i => beacons[i], { size: 5, color: "#ff8a7a" }).object);
       // a light travelling along every link, from the hub out to a docked module and from a docked module out to its second-ring neighbours
       const runs = [...L.docked.map(m => [[0, 0, GAP], m.at]), ...L.second.filter(m => m.anchor).map(m => [at.get(m.anchor), m.at])];
       fx = sparks(runs.length, (i, t) => { const [p, q] = runs[i], f = (t * 0.35 + i * 0.618) % 1; return [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f]; }, { size: 4, color: "#ffe9a8" });
