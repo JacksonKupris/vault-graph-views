@@ -5,7 +5,7 @@
 //   data.nodes[]   tasks (open tasks), taskAge (days the oldest has waited; age when the data has none), cluster
 //   inputs.selected  the host's selected note
 //   onOpen(id)     a note · onAction("graph") with no open tasks, onAction("triage") to go through the tasks one by one
-import { Mesh, InstancedMesh, CylinderGeometry, CircleGeometry, RingGeometry, MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineSegments, LineBasicMaterial, Matrix4, Color, DoubleSide } from "three";
+import { Mesh, InstancedMesh, CylinderGeometry, CircleGeometry, RingGeometry, MeshBasicMaterial, BufferGeometry, Float32BufferAttribute, LineSegments, LineBasicMaterial, Matrix4, Color, DoubleSide, AdditiveBlending } from "three";
 import { special, hash } from "../notes.js";
 import { plural, clip } from "../text.js";
 
@@ -35,7 +35,7 @@ export function radarLayout(data) {
 
 export const radar = {
   id: "radar", name: "Radar", hint: "Open tasks as blips by how long they've waited; red = 90+ days",
-  home: { yaw: 0, pitch: 1.5, dist: 46, min: 14, max: 110, minPitch: 0.55, maxPitch: 1.5, pan: true }, stage: { fog: false, ambient: 1 },
+  home: { yaw: 0, pitch: 1.5, dist: 46, min: 14, max: 110, minPitch: 0.55, maxPitch: 1.5, pan: true }, stage: { fog: false, ambient: 1, glow: { strength: 0.7, radius: 0.5, threshold: 0.4 } },
   actions: ["graph", "triage"],
   build({ stage, frame, orbit, data, inputs, onOpen, onAction, theme, invalidate }) {
     const L = radarLayout(data), byId = new Map(L.blips.map(b => [b.n.id, b])), add = o => { stage.scene.add(o); return o; };
@@ -49,6 +49,7 @@ export const radar = {
     }
     const m4 = new Matrix4(), col = new Color(), line = (pts, color, opacity) => { const g = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(pts, 3)); return add(new LineSegments(g, new LineBasicMaterial({ color, transparent: true, opacity }))); };
 
+    stage.sky({ top: "#010604", haze: "#03120a" });
     // the screen: a dark disc, four range rings, the red ring of 90 days, and a spoke where each topic's slice begins
     add(flat(new Mesh(new CircleGeometry(RMAX, 64), new MeshBasicMaterial({ color: "#04140b" }))));
     const ring = (r, color, opacity, w = 0.05) => add(flat(new Mesh(new RingGeometry(r - w, r + w, 96), new MeshBasicMaterial({ color, transparent: true, opacity, side: DoubleSide })))).position.set(0, 0.02, 0);
@@ -57,7 +58,14 @@ export const radar = {
     for (let i = 1; i <= 4; i++) ring((RMAX * i) / 4, GREEN, 0.25);
     ring(L.hold, RED, 0.7, 0.07);
     line(L.sectors.flatMap(s => [0, 0.03, 0, Math.cos(s.a0) * RMAX, 0.03, Math.sin(s.a0) * RMAX]), GREEN, 0.3);
-    const sweep = add(flat(new Mesh(new CircleGeometry(RMAX, 32, 0, 0.7), new MeshBasicMaterial({ color: GREEN, transparent: true, opacity: 0.22, side: DoubleSide }))));
+    // bearing ticks round the rim (every 5 degrees, longer every 30) and a cross through the middle
+    const tk = []; for (let d = 0; d < 360; d += 5) { const a = (d * Math.PI) / 180, long = d % 30 === 0, r0 = RMAX - (long ? 0.9 : 0.45); tk.push(Math.cos(a) * r0, 0.03, Math.sin(a) * r0, Math.cos(a) * RMAX, 0.03, Math.sin(a) * RMAX); }
+    line(tk, GREEN, 0.55); line([-RMAX, 0.03, 0, RMAX, 0.03, 0, 0, 0.03, -RMAX, 0, 0.03, RMAX], GREEN, 0.14);
+    // the sweep: a fan whose bright edge leads and whose tail fades like phosphor (vertex colours, added to the screen)
+    const FAN = 1.3, SEG = 40, pos = [0, 0, 0], cols = [0, 0, 0], idx = [], g0 = new Color(GREEN);
+    for (let i = 0; i <= SEG; i++) { const f = i / SEG, a = f * FAN, k = Math.pow(1 - f, 2) * 0.75; pos.push(Math.cos(a) * RMAX, Math.sin(a) * RMAX, 0); cols.push(g0.r * k, g0.g * k, g0.b * k); if (i) idx.push(0, i, i + 1); }
+    const fan = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(pos, 3)).setAttribute("color", new Float32BufferAttribute(cols, 3)); fan.setIndex(idx);
+    const sweep = add(flat(new Mesh(fan, new MeshBasicMaterial({ vertexColors: true, transparent: true, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }))));
     sweep.position.y = 0.05;
 
     const blips = add(new InstancedMesh(new CylinderGeometry(1, 1, 1, 14), new MeshBasicMaterial(), L.blips.length)); blips.frustumCulled = false;
@@ -69,12 +77,15 @@ export const radar = {
       return `${plural(L.tasks, "open task")} · ${plural(L.notes, "note")}`;
     };
     const mix = (c, k) => col.set(c).multiplyScalar(k);
+    // a blip lights up as the sweep passes it and fades behind: the angle since the leading edge crossed it
+    let beam = 0;
+    const angleOf = L.blips.map(b => Math.atan2(b.z, b.x)), ping = i => { const d = (((beam - angleOf[i]) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); return Math.exp(-d * 1.3); };
     function paint() {
       const f = focus();
       L.blips.forEach((b, i) => {
-        const on = !f || b.n.id === f, size = b.r * (b.n.id === f ? 1.5 : 1);
+        const on = !f || b.n.id === f, size = b.r * (b.n.id === f ? 1.5 : 1), base = b.holding ? RED : GREEN;
         m4.makeScale(size, b.h, size).setPosition(b.x, b.h / 2, b.z); blips.setMatrixAt(i, m4);
-        blips.setColorAt(i, on ? col.set(b.n.id === f ? theme.fg : b.holding ? RED : GREEN) : mix(b.holding ? RED : GREEN, 0.25));
+        blips.setColorAt(i, on ? (b.n.id === f ? col.set(theme.fg) : mix(base, 0.55 + 0.9 * (held ? 0.3 : ping(i)))) : mix(base, 0.25));
       });
       blips.instanceMatrix.needsUpdate = true; if (blips.instanceColor) blips.instanceColor.needsUpdate = true;
       // the slice names at the rim, the busiest blips by name; the picked one always, and a way to open it
@@ -98,14 +109,15 @@ export const radar = {
     const controls = () => frame.controls({ lines: [hold.length ? `${plural(hold.length, "note")} holding past ${HOLD_DAYS} days` : "Pick a blip to open its note"], buttons: [{ label: orbit.tilted ? "Flat" : "Tilt", title: orbit.tilted ? "Look straight down again" : "Tilt into 3D: a blip becomes a column as tall as its task count", run: () => { orbit.tilt(); controls(); } }, ...(hold.length ? [{ label: "Triage", title: "Go through the open tasks one by one", run: () => onAction("triage") }] : [])] });
     controls(); paint();
     const started = performance.now(); let timer = 0;
-    const turn = t => { sweep.rotation.z = -((t * 0.5) % (2 * Math.PI)); };
+    const turn = t => { beam = (t * 0.5) % (2 * Math.PI); sweep.rotation.z = -beam; };
     turn(0);
+    const recolour = () => { if (focus()) return; L.blips.forEach((b, i) => { blips.setColorAt(i, mix(b.holding ? RED : GREEN, 0.55 + 0.9 * ping(i))); }); if (blips.instanceColor) blips.instanceColor.needsUpdate = true; };
     return {
       targets: () => L.blips.map(b => ({ at: [b.x, b.h / 2, b.z], r: Math.max(0.7, b.r * 1.3), key: { kind: "note", id: b.n.id, tip: `${b.n.name} · ${plural(b.n.tasks, "open task")} · waiting ${waited(b.n)} days` } })),
       click(k) { if (k.kind === "note") open(k.id); },
       hover(k) { const h = k && k.kind === "note" ? k.id : null; if (h !== hovered) { hovered = h; paint(); } },
       update(next) { if ("selected" in next) { selected = next.selected && byId.has(next.selected) ? next.selected : null; paint(); } },
-      frame() { if (held) return; turn((performance.now() - started) / 1000); clearTimeout(timer); timer = setTimeout(invalidate, 33); },
+      frame() { if (held) return; turn((performance.now() - started) / 1000); recolour(); clearTimeout(timer); timer = setTimeout(invalidate, 33); },
       stat,
       today: () => (hold.length ? { text: `${plural(hold.length, "note")} ${hold.length === 1 ? "has" : "have"} tasks waiting ${HOLD_DAYS}+ days · oldest: ${clip(oldest.n.name, 30)} (${waited(oldest.n)} days)`, label: "Triage", run: () => onAction("triage") } : null),
       api: { layout: () => L, selected: () => selected, hold() { held = true; invalidate(); }, blips: () => L.blips.length, holding: () => hold.length, tilted: () => orbit.tilted },
