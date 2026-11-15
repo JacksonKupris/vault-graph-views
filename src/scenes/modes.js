@@ -13,7 +13,7 @@ export const UP = "#f59e0b", DOWN = "#38bdf8", RISE = 6, SWING = 0.18, GRID = 44
 
 export const modes = {
   id: "modes", name: "Normal modes", hint: "How the vault would ring: its natural cuts into halves",
-  home: { yaw: 0.7, pitch: 0.8, dist: 50, min: 14, max: 110 }, stage: { fog: [40, 100] },
+  home: { yaw: 0.7, pitch: 0.8, dist: 50, min: 14, max: 110 }, stage: { light: "camera", fog: [70, 170], ambient: 0.6, glow: { strength: 0.55, radius: 0.5, threshold: 0.8 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const V = vaultModes(data.nodes, data.links, { max: 80 }), n = V.ids.length;
@@ -42,11 +42,12 @@ export const modes = {
     }
     sheet.setAttribute("color", new Float32BufferAttribute(new Float32Array(vcount * 3), 3));
     const skin = add(new Mesh(sheet, new MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05, side: DoubleSide, transparent: true, opacity: 0.9 })));
-    const mesh = add(new Mesh(sheet, new MeshStandardMaterial({ color: theme.fg, wireframe: true, transparent: true, opacity: 0.12 })));
+    const mesh = add(new Mesh(sheet, new MeshStandardMaterial({ color: theme.fg, wireframe: true, transparent: true, opacity: 0.1 })));
     const beads = add(new InstancedMesh(new SphereGeometry(1, 16, 12), new MeshStandardMaterial({ roughness: 0.4 }), n));
     const springs = new BufferGeometry(); springs.setAttribute("position", new BufferAttribute(new Float32Array(V.bars.length * 6), 3));
     const wire = add(new LineSegments(springs, new LineBasicMaterial({ color: theme.fg, transparent: true, opacity: 0.55 })));
     wire.frustumCulled = beads.frustumCulled = skin.frustumCulled = mesh.frustumCulled = false;
+    stage.sky({ top: "#03050b", haze: "#0a0f1c" });   // a dark room, so the lit sheet is the brightest thing in it
     const size = i => 0.4 + (i < 6 ? 0.2 : 0);   // the most important notes are a little bigger
 
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
