@@ -45,7 +45,7 @@ export function reactorLayout(data) {
 
 export const reactor = {
   id: "reactor", name: "Reactor", hint: "The last 30 days as a reactor: edited notes are fuel, stale notes others link to are control rods",
-  home: { yaw: YAW, pitch: 0.42, dist: 62, min: 10, max: 200 }, stage: { light: "camera", fog: [90, 300], ambient: 0.6 },
+  home: { yaw: YAW, pitch: 0.42, dist: 62, min: 10, max: 200 }, stage: { light: "camera", fog: [90, 300], ambient: 0.6, glow: { strength: 0.7, radius: 0.5, threshold: 0.6 } },
   actions: ["graph"],
   build({ stage, frame, data, onOpen, onAction, theme, invalidate }) {
     const L = reactorLayout(data), byId = new Map(data.nodes.map(n => [n.id, n])), name = id => byId.get(id).name;

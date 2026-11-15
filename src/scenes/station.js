@@ -41,7 +41,7 @@ export function stationLayout(data, cluster) {
 
 export const station = {
   id: "station", name: "Station", hint: "One topic as a ring station: notes its map links are docked, the rest ride the second ring or drift outside",
-  home: { yaw: 0.65, pitch: 0.28, dist: 50, min: 12, max: 170, minPitch: -1.4 }, stage: { light: "camera", fog: [80, 260], ambient: 0.5 },
+  home: { yaw: 0.65, pitch: 0.28, dist: 50, min: 12, max: 170, minPitch: -1.4 }, stage: { light: "camera", fog: [80, 260], ambient: 0.5, glow: { strength: 0.8, radius: 0.6, threshold: 0.55 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const byId = new Map(data.nodes.map(n => [n.id, n])), topicOf = id => (byId.has(id) ? byId.get(id).cluster : undefined);
@@ -94,6 +94,7 @@ export const station = {
       ] });
     }
     function go(cluster) { if (cluster === undefined || cluster === L.cluster) return; const next = stationLayout(data, cluster); if (next.cluster !== cluster) return; L = next; draw(); }
+    stage.sky({ top: "#02050f", haze: "#0b1432", stars: 500, starColor: "#cfe0ff" });   // the station sits in space
     draw();
     const tips = { active: "edited lately", steady: "", stale: "stale" }, tip = (m, where) => [name(m.id), where, tips[m.state]].filter(Boolean).join(" · ");
     return {

@@ -59,7 +59,7 @@ const AWAY = ["one link away", "two links away", "three links away"];
 
 export const atom = {
   id: "atom", name: "Atom", hint: "One note as an atom: its links are the nucleus, the notes one, two and three links away its shells",
-  home: { yaw: 0.25, pitch: 0.2, dist: 33, min: 10, max: 160, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 240], ambient: 0.55 },
+  home: { yaw: 0.25, pitch: 0.2, dist: 33, min: 10, max: 160, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 240], ambient: 0.55, glow: { strength: 0.9, radius: 0.7, threshold: 0.5 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     let L = atomLayout(data, inputs.selected), model = null;
@@ -102,6 +102,7 @@ export const atom = {
     // an electron (or any linked note the host selects) becomes the nucleus
     function centreOn(id) { if (id === L.centre || !L.own.has(id)) return; const next = atomLayout(data, id); if (next.centre !== id) return; back.push(L.centre); L = next; draw(); }
     function pick(id) { centreOn(id); invalidate(); onOpen(id); }
+    stage.sky({ top: "#02050f", haze: "#0b1432", stars: 500, starColor: "#cfe0ff" });   // deep space behind the atom
     draw();
     return {
       targets: () => [{ at: [0, 0, 0], r: L.nucleusR, key: { kind: "note", id: L.centre, tip: `${name(L.centre)} · ${plural(L.protons, "link")} in, ${L.neutrons} out` } },
