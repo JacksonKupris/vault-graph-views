@@ -45,7 +45,7 @@ export const station = {
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const byId = new Map(data.nodes.map(n => [n.id, n])), topicOf = id => (byId.has(id) ? byId.get(id).cluster : undefined);
-    let L = stationLayout(data, topicOf(inputs.selected)), model = null, fx = null;
+    let L = stationLayout(data, topicOf(inputs.selected)), model = null, fx = null, lit = null;
     if (!L.core) return tooFew(frame, onAction, plural(data.nodes.length, "note"), ["The Station needs notes in a topic.", "No notes yet."]);
     const name = id => byId.get(id).name, shown = (list, n) => (list.length < n ? `${list.length} of ${n}` : `${n}`);
     const stat = () => `${L.name} · ${L.counts.docked} docked · ${L.counts.second} on the second ring · ${L.counts.adrift} adrift`;
@@ -73,6 +73,9 @@ export const station = {
       const runs = [...L.docked.map(m => [[0, 0, GAP], m.at]), ...L.second.filter(m => m.anchor).map(m => [at.get(m.anchor), m.at])];
       fx = sparks(runs.length, (i, t) => { const [p, q] = runs[i], f = (t * 0.35 + i * 0.618) % 1; return [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f]; }, { size: 4, color: "#ffe9a8" });
       model.add(fx.object);
+      // lit windows round both rings, a few flickering
+      const WIN = 150; lit = sparks(WIN, (i, t) => { const a = (i / WIN) * Math.PI * 2, z = i % 2 ? GAP : -GAP, r = RING + (i % 3 - 1) * 0.35; return [r * Math.cos(a), r * Math.sin(a), z + 0.45 * (i % 5 === 0 ? 1 : -1) * (0.6 + 0.4 * Math.sin(t * 2.5 + i * 7) * (i % 7 === 0 ? 1 : 0))]; }, { size: 2.4, color: "#ffd98a", opacity: 0.9 });
+      model.add(lit.object);
       stage.scene.add(model);
       const open = m => ({ run: () => onOpen(m.id), title: `Open ${name(m.id)}` });
       const labels = [{ text: clip(L.core.name, 34), at: [0, 1.6, 3.5], strong: true, dy: -16, run: () => onOpen(L.core.id), title: `Open ${L.core.name}` }];
@@ -111,7 +114,7 @@ export const station = {
       stat,
       today: () => (L.adrift.length ? { text: `${name(L.adrift[0].id)} links with nothing in ${L.name}.`, label: "Open note", run: () => onOpen(L.adrift[0].id) } : null),
       api: { layout: () => L, go: c => { go(c); invalidate(); } },
-      tick(t) { if (fx) fx.tick(t); },
+      tick(t) { if (fx) fx.tick(t); if (lit) lit.tick(t); },
       dispose() { if (model) scrap(stage.scene, model); },
     };
   },

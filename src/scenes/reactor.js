@@ -4,7 +4,7 @@
 // The four topics with the most edited notes are the four coolant loops; pick one to see only its rods.
 //   data.nodes[]  age, recent, inlinks, cluster · data.clusters[] · data.quality.stale_days
 //   onOpen(id) a note · onAction("graph") when nothing was edited and nothing is stale
-import { Mesh, Group, CylinderGeometry, SphereGeometry, MeshPhongMaterial, DoubleSide } from "three";
+import { Mesh, Group, CylinderGeometry, SphereGeometry, RingGeometry, TorusGeometry, PointLight, MeshPhongMaterial, MeshBasicMaterial, AdditiveBlending, DoubleSide, BackSide } from "three";
 import { special, activityOf, staleOf } from "../notes.js";
 import { sparks, copies, span, mix, scrap } from "../models/parts.js";
 import { plural, clip } from "../text.js";
@@ -50,7 +50,7 @@ export const reactor = {
   build({ stage, frame, data, onOpen, onAction, theme, invalidate }) {
     const L = reactorLayout(data), byId = new Map(data.nodes.map(n => [n.id, n])), name = id => byId.get(id).name;
     if (!L.fuel.length && !L.control.length) return tooFew(frame, onAction, plural(data.nodes.length, "note"), [`The Reactor needs notes edited in the last ${WINDOW} days, or stale notes other notes link to.`, "Neither yet."]);
-    let model = null, only = null, fx = null;
+    let model = null, only = null, fx = null, tips = null, steam = null, flow = null;
     const colour = c => theme.palette[(c || 0) % theme.palette.length], k = L.k == null ? null : L.k.toFixed(2);
     const stat = () => `${k ? `k ${k} · ` : ""}${plural(L.edited, "note")} edited in ${WINDOW} days · ${L.wentStale || "none"} went stale · ${plural(L.control.length, "control rod")}`;
     // where loop i stands: round the back of the hall, away from the cut
@@ -58,13 +58,21 @@ export const reactor = {
     function draw() {
       if (model) scrap(stage.scene, model);
       model = new Group();
-      const steel = mix(theme.muted, theme.fg, 0.35), concrete = mix(theme.muted, theme.bg, 0.45), dark = mix(theme.fg, theme.bg, 0.25), dim = c => (only == null || only === c ? 0 : 0.82);
+      const steel = mix("#5b6b86", theme.bg, 0.25), concrete = mix("#1b2742", theme.bg, 0.2), dark = mix(theme.fg, theme.bg, 0.25), dim = c => (only == null || only === c ? 0 : 0.82);
       const phong = (c, more) => new MeshPhongMaterial({ color: c, specular: "#666666", shininess: 35, ...more }), lay = (geo, mat, y) => { const o = new Mesh(geo, mat); o.position.y = y; model.add(o); return o; };
       const wall = (r, h) => new CylinderGeometry(r, r, h, 64, 1, true, YAW + CUT / 2, Math.PI * 2 - CUT), cap = (r, up) => new SphereGeometry(r, 64, 20, YAW + CUT / 2 + Math.PI / 2, Math.PI * 2 - CUT, up ? 0 : Math.PI / 2, Math.PI / 2);
       // the hall: a slab, a concrete wall and dome with a quarter cut away
       lay(new CylinderGeometry(19, 19, 1, 64), phong(concrete), -5.5);
+      // rings of light on the slab, and a blue glow in the water (Cherenkov light) that the bloom spreads
+      const glowMat = (c, o, side = DoubleSide) => new MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: AdditiveBlending, depthWrite: false, side });
+      [8, 12.5, 16, 18.4].forEach((r, i) => { const ring = lay(new RingGeometry(r - 0.07, r + 0.07, 96), glowMat(i === 3 ? "#38bdf8" : "#1d4ed8", 0.55 - i * 0.08), -4.98); ring.rotation.x = -Math.PI / 2; });
+      // hoops round the containment wall and ribs over the dome, drawn in light
+      [-3, 1, 5, 9, 13].forEach(y => { const h = lay(new TorusGeometry(18, 0.045, 6, 128), glowMat("#3b82f6", 0.5), y - 1); h.rotation.x = Math.PI / 2; });
+      for (let i = 0; i < 12; i++) { const rib = lay(new TorusGeometry(18, 0.045, 6, 64, Math.PI / 2), glowMat("#3b82f6", 0.38), 12); rib.scale.y = 0.6; rib.rotation.order = "YXZ"; rib.rotation.y = (i / 12) * Math.PI * 2; rib.rotation.z = 0; }
+      const lamp = new PointLight("#38bdf8", 90, 40, 1.6); lamp.position.set(0, 3.5, 0); model.add(lamp);
+      lay(new CylinderGeometry(5.9, 5.9, TOP, 48, 1, true), glowMat("#22d3ee", 0.16, BackSide), TOP / 2);
       // the hall is see-through glass-grey, so the vessel inside shows
-      const hall = { side: DoubleSide, transparent: true, opacity: 0.42, depthWrite: false };
+      const hall = { side: DoubleSide, transparent: true, opacity: 0.3, depthWrite: false };
       lay(wall(18, 17), phong(concrete, hall), 3.5); lay(cap(18, true), phong(concrete, hall), 12).scale.y = 0.6;
       // the vessel: a steel wall and bottom with the same cut, the water in it, the plate the control rods hang from
       lay(wall(6.2, 12), phong(steel, { side: DoubleSide }), 3); lay(cap(6.2, false), phong(steel, { side: DoubleSide }), -3).scale.y = 0.5; lay(cap(6.2, true), phong(steel, { side: DoubleSide }), 9).scale.y = 0.5;
@@ -87,6 +95,17 @@ export const reactor = {
       const bub = L.fuel.slice(0, 48);
       fx = sparks(bub.length, (i, t) => { const f = bub[i], u = (t * (0.18 + 0.1 * ((i * 7) % 5) / 5) + i * 0.37) % 1; return [f.at[0] + 0.35 * Math.sin(t * 2 + i), u * TOP, f.at[1] + 0.35 * Math.cos(t * 2 + i)]; }, { size: 3, color: "#bfe9ff", opacity: 0.8 });
       model.add(fx.object);
+      // glowing tips on the fuel rods, brighter the livelier the note, breathing out of step
+      const tipsAt = L.fuel.map(f => [f.at[0], f.h, f.at[1]]);
+      tips = sparks(tipsAt.length, (i, t) => [tipsAt[i][0], tipsAt[i][1] + 0.1 + 0.05 * Math.sin(t * 3 + i), tipsAt[i][2]], { size: 6, color: "#a5f3fc", opacity: 1 });
+      model.add(tips.object);
+      // steam rising off each generator
+      const gens = L.loops.map((lp, i) => round(bearing(i), 13.5, 8));
+      steam = gens.length ? sparks(gens.length * 14, (i, t) => { const g = gens[i % gens.length], u = (t * 0.12 + i * 0.173) % 1; return [g[0] + 0.9 * Math.sin(i * 2.3 + u * 4), g[1] + u * 6, g[2] + 0.9 * Math.cos(i * 1.7 + u * 4)]; }, { size: 9, color: "#cbd5e1", opacity: 0.12 }) : null;
+      if (steam) model.add(steam.object);
+      // lights running along the hot and cold legs
+      flow = pipes.length ? sparks(pipes.length * 4, (i, t) => { const p = pipes[i % pipes.length], u = (t * 0.22 + Math.floor(i / pipes.length) / 4) % 1; return [0, 1, 2].map(j => p.from[j] + (p.to[j] - p.from[j]) * u); }, { size: 4, color: "#fff1c2", opacity: 0.95 }) : null;
+      if (flow) model.add(flow.object);
       model.add(copies(rod(12), phong("#ffffff"), pipes, (p, i, m) => { span(m, p.from, p.to, p.w); return p.c; }));
       stage.scene.add(model);
       const labels = L.loops.map((lp, i) => ({ text: `${clip(lp.name, 20)} (${lp.edited})`, at: round(bearing(i), 13.5, 9), dy: -14, run: () => filter(lp.cluster), title: `Only ${lp.name}` }));
@@ -120,7 +139,7 @@ export const reactor = {
       stat,
       today: () => (L.control[0] ? { text: `${name(L.control[0].id)} is stale and ${plural(L.control[0].links, "note")} link to it.`, label: "Open note", run: () => onOpen(L.control[0].id) } : null),
       api: { layout: () => L, filter, only: () => only },
-      tick(t) { if (fx) fx.tick(t); },
+      tick(t) { for (const f of [fx, tips, steam, flow]) if (f) f.tick(t); },
       dispose() { if (model) scrap(stage.scene, model); },
     };
   },
