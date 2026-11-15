@@ -62,7 +62,7 @@ export const atom = {
   drift: 0.08, home: { yaw: 0.25, pitch: 0.2, dist: 33, min: 10, max: 160, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 240], ambient: 0.55, glow: { strength: 0.9, radius: 0.7, threshold: 0.5 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
-    let L = atomLayout(data, inputs.selected), model = null, fx = null, halos = [];
+    let L = atomLayout(data, inputs.selected), model = null, fx = null, tails = null, cloud = null, halos = [];
     if (!L.centre) return tooFew(frame, onAction, plural(data.nodes.length, "note"), ["The Atom needs notes that link to one another.", "No written links yet."]);
     const name = id => L.own.get(id).name, colour = id => theme.palette[(L.own.get(id).cluster || 0) % theme.palette.length], back = [];
     const shiny = () => new MeshPhongMaterial({ color: "#ffffff", specular: "#777777", shininess: 55 });
@@ -78,6 +78,13 @@ export const atom = {
       const rot = TILT.map(t => new Euler(...t)), lamp = new Vector3();
       fx = sparks(9, (i, t) => { const k = Math.floor(i / 3), a = t * (0.9 - 0.25 * k) + ((i % 3) * Math.PI * 2) / 3; return lamp.set(RADII[k] * Math.cos(a), RADII[k] * Math.sin(a), 0).applyEuler(rot[k]).toArray(); }, { size: 5, color: "#bfdcff" });
       model.add(fx.object);
+      // each light drags a tail behind it, fading with distance
+      tails = sparks(9 * 7, (i, t) => { const e = i % 9, j = Math.floor(i / 9) + 1, k = Math.floor(e / 3), a = t * (0.9 - 0.25 * k) + ((e % 3) * Math.PI * 2) / 3 - j * 0.09; return lamp.set(RADII[k] * Math.cos(a), RADII[k] * Math.sin(a), 0).applyEuler(rot[k]).toArray(); }, { size: 2.6, color: "#6aa8ff", opacity: 0.55 });
+      model.add(tails.object);
+      // the electron cloud: a haze of faint points thickest on each shell, shimmering, as in the quantum picture
+      const CLOUD = 720, pick = i => [RADII[i % 3], (((i * 2654435761) >>> 0) % 10007) / 10007, (((i * 40503) >>> 0) % 7919) / 7919, (((i * 69069) >>> 0) % 6007) / 6007];
+      cloud = sparks(CLOUD, (i, t) => { const [r, u, v, w] = pick(i), th = u * Math.PI * 2 + 0.05 * t * (1 + (i % 3)), ph = Math.acos(2 * v - 1), rr = r * (1 + 0.16 * (w - 0.5) + 0.02 * Math.sin(t * 2 + i)); return [rr * Math.sin(ph) * Math.cos(th), rr * Math.cos(ph), rr * Math.sin(ph) * Math.sin(th)]; }, { size: 1.6, color: "#7fb6ff", opacity: 0.5 });
+      model.add(cloud.object);
       L.shells.forEach((s, k) => {
         // the inner shell is the boldest and the outer the faintest, a ring in the topic-neutral blue-grey
         const ring = new Mesh(new TorusGeometry(RADII[k], 0.16 - 0.04 * k, 8, 160), new MeshBasicMaterial({ color: mix(NEUTRON, theme.fg, 0.35 + 0.15 * k), transparent: true, opacity: s.ids.length ? 0.85 - 0.2 * k : 0.25 }));
@@ -115,7 +122,7 @@ export const atom = {
       update(next) { if ("selected" in next && next.selected) centreOn(next.selected); },
       stat, today: () => null,
       api: { layout: () => L, centre: () => L.centre, back: () => back.length },
-      tick(t) { if (fx) fx.tick(t); halos.forEach((h, i) => h.scale.setScalar(1 + 0.05 * Math.sin(t * 1.6 + i))); },
+      tick(t) { if (fx) fx.tick(t); if (tails) tails.tick(t); if (cloud) cloud.tick(t); halos.forEach((h, i) => h.scale.setScalar(1 + 0.05 * Math.sin(t * 1.6 + i))); },
       dispose() { if (model) scrap(stage.scene, model); },
     };
   },
