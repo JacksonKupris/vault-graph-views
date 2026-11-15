@@ -7,7 +7,7 @@
 import { Mesh, Group, SphereGeometry, TorusGeometry, MeshPhongMaterial, MeshBasicMaterial, Vector3, Euler, AdditiveBlending, BackSide } from "three";
 import { adjacency } from "../network.js";
 import { importanceOf } from "../notes.js";
-import { copies, mix, scrap } from "../models/parts.js";
+import { copies, mix, scrap, sparks } from "../models/parts.js";
 import { plural, clip } from "../text.js";
 import { tooFew } from "./few.js";
 
@@ -59,10 +59,10 @@ const AWAY = ["one link away", "two links away", "three links away"];
 
 export const atom = {
   id: "atom", name: "Atom", hint: "One note as an atom: its links are the nucleus, the notes one, two and three links away its shells",
-  home: { yaw: 0.25, pitch: 0.2, dist: 33, min: 10, max: 160, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 240], ambient: 0.55, glow: { strength: 0.9, radius: 0.7, threshold: 0.5 } },
+  drift: 0.08, home: { yaw: 0.25, pitch: 0.2, dist: 33, min: 10, max: 160, minPitch: -1.4 }, stage: { light: "camera", fog: [70, 240], ambient: 0.55, glow: { strength: 0.9, radius: 0.7, threshold: 0.5 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
-    let L = atomLayout(data, inputs.selected), model = null;
+    let L = atomLayout(data, inputs.selected), model = null, fx = null, halos = [];
     if (!L.centre) return tooFew(frame, onAction, plural(data.nodes.length, "note"), ["The Atom needs notes that link to one another.", "No written links yet."]);
     const name = id => L.own.get(id).name, colour = id => theme.palette[(L.own.get(id).cluster || 0) % theme.palette.length], back = [];
     const shiny = () => new MeshPhongMaterial({ color: "#ffffff", specular: "#777777", shininess: 55 });
@@ -73,7 +73,11 @@ export const atom = {
       const ball = () => new SphereGeometry(1, 24, 16);
       model.add(copies(ball(), shiny(), L.nucleus, (p, i, m) => { m.makeScale(BALL, BALL, BALL).setPosition(...p.at); return p.proton ? PROTON : NEUTRON; }));
       // a soft glow round the nucleus, so it reads as the heart of the atom
-      for (const [f, o] of [[1.35, 0.16], [1.9, 0.07]]) { const g = new Mesh(new SphereGeometry(L.nucleusR * f, 32, 16), new MeshBasicMaterial({ color: NEUTRON, transparent: true, opacity: o, blending: AdditiveBlending, depthWrite: false, side: BackSide })); model.add(g); }
+      halos = [[1.35, 0.16], [1.9, 0.07]].map(([f, o]) => { const g = new Mesh(new SphereGeometry(L.nucleusR * f, 32, 16), new MeshBasicMaterial({ color: NEUTRON, transparent: true, opacity: o, blending: AdditiveBlending, depthWrite: false, side: BackSide })); model.add(g); return g; });
+      // lights running round each shell, three to a shell, quicker the closer in
+      const rot = TILT.map(t => new Euler(...t)), lamp = new Vector3();
+      fx = sparks(9, (i, t) => { const k = Math.floor(i / 3), a = t * (0.9 - 0.25 * k) + ((i % 3) * Math.PI * 2) / 3; return lamp.set(RADII[k] * Math.cos(a), RADII[k] * Math.sin(a), 0).applyEuler(rot[k]).toArray(); }, { size: 5, color: "#bfdcff" });
+      model.add(fx.object);
       L.shells.forEach((s, k) => {
         // the inner shell is the boldest and the outer the faintest, a ring in the topic-neutral blue-grey
         const ring = new Mesh(new TorusGeometry(RADII[k], 0.16 - 0.04 * k, 8, 160), new MeshBasicMaterial({ color: mix(NEUTRON, theme.fg, 0.35 + 0.15 * k), transparent: true, opacity: s.ids.length ? 0.85 - 0.2 * k : 0.25 }));
@@ -111,6 +115,7 @@ export const atom = {
       update(next) { if ("selected" in next && next.selected) centreOn(next.selected); },
       stat, today: () => null,
       api: { layout: () => L, centre: () => L.centre, back: () => back.length },
+      tick(t) { if (fx) fx.tick(t); halos.forEach((h, i) => h.scale.setScalar(1 + 0.05 * Math.sin(t * 1.6 + i))); },
       dispose() { if (model) scrap(stage.scene, model); },
     };
   },

@@ -14,11 +14,20 @@ import { nearest, project } from "./pick.js";
 
 export function runScene(el, def, o) {
   const stage = makeStage(el, o.theme, def.stage), frame = makeFrame(el, o.theme);
-  let raf = 0, dead = false, over = null, marks = new Map();
+  let raf = 0, dead = false, over = null, marks = new Map(), hovering = false, last = 0;
+  // Motion is on when the host asks for it (o.motion) and the person hasn't asked for less: a scene's tick(t) moves its lights, and a
+  // scene that says drift turns slowly while the pointer is away from it. The drawing then repeats every frame; otherwise only on change.
+  const moving = !!o.motion && !(globalThis.matchMedia && globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  stage.canvas.addEventListener("pointerenter", () => { hovering = true; }); stage.canvas.addEventListener("pointerleave", () => { hovering = false; });
   // a ring on each marked note the scene shows (every scene lists its notes in targets(), kind "note")
   const ring = () => frame.rings(marks.size ? scene.targets().filter(k => k.key.kind === "note" && marks.has(k.key.id)).map(k => ({ at: k.at, r: k.r, n: marks.get(k.key.id) })) : [], stage);
   const settle = () => { if (stage.changed()) refit(); orbit.apply(); if (scene.frame) scene.frame(); frame.place(stage); ring(); };
-  const draw = () => { raf = 0; if (dead) return; settle(); stage.render(); };
+  const draw = () => {
+    raf = 0; if (dead) return;
+    if (moving) { const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now; if (scene.tick) scene.tick(now / 1000, dt); if (def.drift && !hovering) orbit.set({ yaw: orbit.yaw + dt * def.drift }); }
+    settle(); stage.render();
+    if (moving) invalidate();
+  };
   const invalidate = () => { if (!raf && !dead) raf = requestAnimationFrame(draw); };
   const keyAt = (x, y) => { const b = stage.canvas.getBoundingClientRect(); orbit.apply(); return nearest(stage, scene.targets(), x - b.left, y - b.top); };
   const orbit = makeOrbit(stage, {
