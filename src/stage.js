@@ -3,13 +3,19 @@
 //   fog    [near, far] in stage units, or false
 //   light  "fixed" (a sun over the scene) or "camera" (over the viewer's left shoulder however the model is turned,
 //          as a model held in the hand is lit)
-import { WebGLRenderer, Scene, PerspectiveCamera, AmbientLight, DirectionalLight, Color, Fog, Box3, Matrix4, Vector3, Mesh, SphereGeometry, MeshBasicMaterial, BackSide, Float32BufferAttribute, Points, BufferGeometry, PointsMaterial } from "three";
+//   glow   { strength, radius, threshold } turns on the cinematic look: film tone mapping and a bloom, so bright parts shine
+import { WebGLRenderer, Scene, PerspectiveCamera, AmbientLight, DirectionalLight, Color, Fog, Box3, Matrix4, Vector3, Mesh, SphereGeometry, MeshBasicMaterial, BackSide, Float32BufferAttribute, Points, BufferGeometry, PointsMaterial, ACESFilmicToneMapping, Vector2 } from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
-export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0.6 } = {}) {
+export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0.6, glow = null } = {}) {
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
   renderer.setClearColor(new Color(t.bg));
   el.appendChild(renderer.domElement);
+  if (glow) renderer.toneMapping = ACESFilmicToneMapping;
   const scene = new Scene();
   if (fog) scene.fog = new Fog(new Color(t.bg), fog[0], fog[1]);
   const camera = new PerspectiveCamera(50, 1, 0.1, 400);
@@ -20,8 +26,16 @@ export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0
   function resize() {
     const w = el.clientWidth || 300, h = el.clientHeight || 300;
     renderer.setSize(w, h);
+    if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+  }
+  // the cinematic pass chain: the scene, a bloom of its brightest parts, then tone mapping to the screen
+  let composer = null;
+  if (glow) {
+    composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new UnrealBloomPass(new Vector2(256, 256), glow.strength ?? 0.8, glow.radius ?? 0.6, glow.threshold ?? 0.55));
+    composer.addPass(new OutputPass());
   }
   resize();
   // Where the scene really is: its centre and a radius that holds the bulk of what is drawn, so a layout of any scale (a few
@@ -81,11 +95,12 @@ export function makeStage(el, t, { fog = [40, 120], light = "fixed", ambient = 0
       scene.add(dome); dome.position.copy(camera.position);
       renderer.setClearColor(a); if (fog) scene.fog.color.copy(a);
     },
-    render() { renderer.render(scene, camera); },
+    render() { if (composer) composer.render(); else renderer.render(scene, camera); },
     // the picture as a PNG data URL: drawn and read in one step, since WebGL clears its buffer after a frame is shown
-    snapshot() { renderer.render(scene, camera); return renderer.domElement.toDataURL("image/png"); },
+    snapshot() { this.render(); return renderer.domElement.toDataURL("image/png"); },
     dispose() {
       scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); if (o.isInstancedMesh) o.dispose(); });
+      if (composer) composer.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },

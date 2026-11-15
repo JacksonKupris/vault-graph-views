@@ -9,7 +9,7 @@ import { Mesh, Group, BoxGeometry, CylinderGeometry, SphereGeometry, TorusGeomet
 import { adjacency } from "../network.js";
 import { districtsOf, scatter } from "../districts.js";
 import { importanceOf, activityOf, staleOf, hash } from "../notes.js";
-import { copies, span, mix, scrap } from "../models/parts.js";
+import { sparks, copies, span, mix, scrap } from "../models/parts.js";
 import { plural, clip } from "../text.js";
 import { tooFew } from "./few.js";
 
@@ -41,11 +41,11 @@ export function stationLayout(data, cluster) {
 
 export const station = {
   id: "station", name: "Station", hint: "One topic as a ring station: notes its map links are docked, the rest ride the second ring or drift outside",
-  home: { yaw: 0.65, pitch: 0.28, dist: 50, min: 12, max: 170, minPitch: -1.4 }, stage: { light: "camera", fog: [80, 260], ambient: 0.5 },
+  drift: 0.06, home: { yaw: 0.65, pitch: 0.28, dist: 50, min: 12, max: 170, minPitch: -1.4 }, stage: { light: "camera", fog: [80, 260], ambient: 0.5, glow: { strength: 0.8, radius: 0.6, threshold: 0.55 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const byId = new Map(data.nodes.map(n => [n.id, n])), topicOf = id => (byId.has(id) ? byId.get(id).cluster : undefined);
-    let L = stationLayout(data, topicOf(inputs.selected)), model = null;
+    let L = stationLayout(data, topicOf(inputs.selected)), model = null, fx = null;
     if (!L.core) return tooFew(frame, onAction, plural(data.nodes.length, "note"), ["The Station needs notes in a topic.", "No notes yet."]);
     const name = id => byId.get(id).name, shown = (list, n) => (list.length < n ? `${list.length} of ${n}` : `${n}`);
     const stat = () => `${L.name} · ${L.counts.docked} docked · ${L.counts.second} on the second ring · ${L.counts.adrift} adrift`;
@@ -59,15 +59,20 @@ export const station = {
       lay(new CylinderGeometry(1.5, 1.5, 7, 28), metal(hull), [0, 0, 0], [Math.PI / 2, 0, 0]);
       lay(new SphereGeometry(1.5, 28, 16), metal(topic), [0, 0, 3.5]); lay(new SphereGeometry(1.5, 28, 16), metal(hull), [0, 0, -3.5]);
       lay(new CylinderGeometry(0.22, 0.22, 16, 10), metal(hull), [0, 0, 0], [Math.PI / 2, 0, 0]);
-      for (const z of [7.2, -7.2]) { lay(new CylinderGeometry(0.12, 0.12, 13, 8), metal(hull), [0, 0, z], [0, 0, Math.PI / 2]); for (const x of [4, -4]) lay(new BoxGeometry(5, 2.6, 0.08), new MeshPhongMaterial({ color: "#1d4ed8", specular: "#93c5fd", shininess: 90 }), [x, 0, z]); }
+      for (const z of [7.2, -7.2]) { lay(new CylinderGeometry(0.12, 0.12, 13, 8), metal(hull), [0, 0, z], [0, 0, Math.PI / 2]); for (const x of [4, -4]) lay(new BoxGeometry(5, 2.6, 0.08), new MeshPhongMaterial({ color: "#1e3a8a", emissive: "#0b1a45", specular: "#93c5fd", shininess: 90 }), [x, 0, z]); }
       // the two rings, their modules, the spokes and the struts
       for (const z of [GAP, -GAP]) lay(new TorusGeometry(RING, 0.16, 8, 96), metal(hull), [0, 0, z]);
       const v = new Vector3(), box = (m, mat) => mat.makeRotationZ(m.a).scale(v.set(0.85 * m.size, 1.15 * m.size, 1.1 * m.size)).setPosition(...m.at);
       model.add(copies(new BoxGeometry(1, 1, 1), metal("#ffffff"), [...L.docked, ...L.second], (m, i, mat) => { box(m, mat); return tint(m); }));
       const at = new Map(L.docked.map(m => [m.id, m.at])), rod = () => new CylinderGeometry(1, 1, 1, 6);
-      model.add(copies(rod(), metal(hull), L.docked, (m, i, mat) => { span(mat, [0, 0, GAP], m.at, 0.05); }));
-      model.add(copies(rod(), metal(hull), L.second.filter(m => m.anchor), (m, i, mat) => { span(mat, m.at, at.get(m.anchor), 0.05); }));
+      const faint = () => new MeshPhongMaterial({ color: hull, transparent: true, opacity: 0.35, depthWrite: false });   // links are drawn light so they read behind the model
+      model.add(copies(rod(), faint(), L.docked, (m, i, mat) => { span(mat, [0, 0, GAP], m.at, 0.05); }));
+      model.add(copies(rod(), faint(), L.second.filter(m => m.anchor), (m, i, mat) => { span(mat, m.at, at.get(m.anchor), 0.05); }));
       model.add(copies(new IcosahedronGeometry(1, 0), new MeshPhongMaterial({ color: "#ffffff", flatShading: true }), L.adrift, (m, i, mat) => { mat.makeRotationZ(i).scale(v.set(0.6 * m.size, 0.45 * m.size, 0.5 * m.size)).setPosition(...m.at); return m.state === "stale" ? grey : mix(topic, grey, 0.6); }));
+      // a light travelling along every link, from the hub out to a docked module and from a docked module out to its second-ring neighbours
+      const runs = [...L.docked.map(m => [[0, 0, GAP], m.at]), ...L.second.filter(m => m.anchor).map(m => [at.get(m.anchor), m.at])];
+      fx = sparks(runs.length, (i, t) => { const [p, q] = runs[i], f = (t * 0.35 + i * 0.618) % 1; return [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f]; }, { size: 4, color: "#ffe9a8" });
+      model.add(fx.object);
       stage.scene.add(model);
       const open = m => ({ run: () => onOpen(m.id), title: `Open ${name(m.id)}` });
       const labels = [{ text: clip(L.core.name, 34), at: [0, 1.6, 3.5], strong: true, dy: -16, run: () => onOpen(L.core.id), title: `Open ${L.core.name}` }];
@@ -93,6 +98,7 @@ export const station = {
       ] });
     }
     function go(cluster) { if (cluster === undefined || cluster === L.cluster) return; const next = stationLayout(data, cluster); if (next.cluster !== cluster) return; L = next; draw(); }
+    stage.sky({ top: "#02050f", haze: "#0b1432", stars: 500, starColor: "#cfe0ff" });   // the station sits in space
     draw();
     const tips = { active: "edited lately", steady: "", stale: "stale" }, tip = (m, where) => [name(m.id), where, tips[m.state]].filter(Boolean).join(" · ");
     return {
@@ -105,6 +111,7 @@ export const station = {
       stat,
       today: () => (L.adrift.length ? { text: `${name(L.adrift[0].id)} links with nothing in ${L.name}.`, label: "Open note", run: () => onOpen(L.adrift[0].id) } : null),
       api: { layout: () => L, go: c => { go(c); invalidate(); } },
+      tick(t) { if (fx) fx.tick(t); },
       dispose() { if (model) scrap(stage.scene, model); },
     };
   },

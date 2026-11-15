@@ -6,7 +6,7 @@
 //   onOpen(id) a note · onAction("graph") when nothing was edited and nothing is stale
 import { Mesh, Group, CylinderGeometry, SphereGeometry, MeshPhongMaterial, DoubleSide } from "three";
 import { special, activityOf, staleOf } from "../notes.js";
-import { copies, span, mix, scrap } from "../models/parts.js";
+import { sparks, copies, span, mix, scrap } from "../models/parts.js";
 import { plural, clip } from "../text.js";
 import { tooFew } from "./few.js";
 
@@ -45,12 +45,12 @@ export function reactorLayout(data) {
 
 export const reactor = {
   id: "reactor", name: "Reactor", hint: "The last 30 days as a reactor: edited notes are fuel, stale notes others link to are control rods",
-  home: { yaw: YAW, pitch: 0.42, dist: 62, min: 10, max: 200 }, stage: { light: "camera", fog: [90, 300], ambient: 0.6 },
+  home: { yaw: YAW, pitch: 0.42, dist: 62, min: 10, max: 200 }, stage: { light: "camera", fog: [90, 300], ambient: 0.6, glow: { strength: 0.7, radius: 0.5, threshold: 0.85 } },
   actions: ["graph"],
   build({ stage, frame, data, onOpen, onAction, theme, invalidate }) {
     const L = reactorLayout(data), byId = new Map(data.nodes.map(n => [n.id, n])), name = id => byId.get(id).name;
     if (!L.fuel.length && !L.control.length) return tooFew(frame, onAction, plural(data.nodes.length, "note"), [`The Reactor needs notes edited in the last ${WINDOW} days, or stale notes other notes link to.`, "Neither yet."]);
-    let model = null, only = null;
+    let model = null, only = null, fx = null;
     const colour = c => theme.palette[(c || 0) % theme.palette.length], k = L.k == null ? null : L.k.toFixed(2);
     const stat = () => `${k ? `k ${k} · ` : ""}${plural(L.edited, "note")} edited in ${WINDOW} days · ${L.wentStale || "none"} went stale · ${plural(L.control.length, "control rod")}`;
     // where loop i stands: round the back of the hall, away from the cut
@@ -63,11 +63,13 @@ export const reactor = {
       const wall = (r, h) => new CylinderGeometry(r, r, h, 64, 1, true, YAW + CUT / 2, Math.PI * 2 - CUT), cap = (r, up) => new SphereGeometry(r, 64, 20, YAW + CUT / 2 + Math.PI / 2, Math.PI * 2 - CUT, up ? 0 : Math.PI / 2, Math.PI / 2);
       // the hall: a slab, a concrete wall and dome with a quarter cut away
       lay(new CylinderGeometry(19, 19, 1, 64), phong(concrete), -5.5);
-      lay(wall(18, 17), phong(concrete, { side: DoubleSide }), 3.5); lay(cap(18, true), phong(concrete, { side: DoubleSide }), 12).scale.y = 0.6;
+      // the hall is see-through glass-grey, so the vessel inside shows
+      const hall = { side: DoubleSide, transparent: true, opacity: 0.42, depthWrite: false };
+      lay(wall(18, 17), phong(concrete, hall), 3.5); lay(cap(18, true), phong(concrete, hall), 12).scale.y = 0.6;
       // the vessel: a steel wall and bottom with the same cut, the water in it, the plate the control rods hang from
       lay(wall(6.2, 12), phong(steel, { side: DoubleSide }), 3); lay(cap(6.2, false), phong(steel, { side: DoubleSide }), -3).scale.y = 0.5; lay(cap(6.2, true), phong(steel, { side: DoubleSide }), 9).scale.y = 0.5;
       lay(new CylinderGeometry(5.9, 5.9, 0.3, 48), phong(dark), -0.2); lay(new CylinderGeometry(5.9, 5.9, 0.3, 48), phong(dark), TOP);
-      lay(new CylinderGeometry(5.8, 5.8, TOP, 48, 1, false, YAW + CUT / 2, Math.PI * 2 - CUT), new MeshPhongMaterial({ color: "#38bdf8", transparent: true, opacity: 0.08, depthWrite: false, side: DoubleSide }), TOP / 2);
+      lay(new CylinderGeometry(5.8, 5.8, TOP, 48, 1, false, YAW + CUT / 2, Math.PI * 2 - CUT), new MeshPhongMaterial({ color: "#38bdf8", transparent: true, opacity: 0.2, depthWrite: false, side: DoubleSide }), TOP / 2);
       const rod = n => new CylinderGeometry(1, 1, 1, n);
       model.add(copies(rod(12), new MeshPhongMaterial({ color: "#ffffff", shininess: 70 }), L.fuel, (f, i, m) => { span(m, [f.at[0], 0, f.at[1]], [f.at[0], f.h, f.at[1]], 0.42); return mix(mix(dark, colour(f.cluster), 0.5 + 0.5 * f.heat), theme.bg, dim(f.cluster)); }));
       model.add(copies(rod(8), phong("#ffffff"), L.control, (c, i, m) => { const low = TOP - ROD * c.depth; span(m, [c.at[0], low, c.at[1]], [c.at[0], low + ROD + 1.4, c.at[1]], 0.2); return mix(dark, theme.bg, dim(c.cluster)); }));
@@ -81,6 +83,10 @@ export const reactor = {
         const pm = new Mesh(new CylinderGeometry(0.9, 0.9, 3.4, 16), phong(mix(steel, theme.bg, f))); pm.position.set(pump[0], 1.2, pump[2]); model.add(pm);
         pipes.push({ from: round(a - 0.07, 6.1, 5), to: round(a - 0.05, 12.4, 5), w, c: mix(HOT, theme.bg, f) }, { from: round(a + 0.05, 12.6, 1), to: [pump[0], 1, pump[2]], w, c: mix(COLD, theme.bg, f) }, { from: [pump[0], 2.4, pump[2]], to: round(a + 0.12, 6.1, 3.2), w, c: mix(COLD, theme.bg, f) });
       });
+      // bubbles rising through the water round the fuel rods
+      const bub = L.fuel.slice(0, 48);
+      fx = sparks(bub.length, (i, t) => { const f = bub[i], u = (t * (0.18 + 0.1 * ((i * 7) % 5) / 5) + i * 0.37) % 1; return [f.at[0] + 0.35 * Math.sin(t * 2 + i), u * TOP, f.at[1] + 0.35 * Math.cos(t * 2 + i)]; }, { size: 3, color: "#bfe9ff", opacity: 0.8 });
+      model.add(fx.object);
       model.add(copies(rod(12), phong("#ffffff"), pipes, (p, i, m) => { span(m, p.from, p.to, p.w); return p.c; }));
       stage.scene.add(model);
       const labels = L.loops.map((lp, i) => ({ text: `${clip(lp.name, 20)} (${lp.edited})`, at: round(bearing(i), 13.5, 9), dy: -14, run: () => filter(lp.cluster), title: `Only ${lp.name}` }));
@@ -102,6 +108,7 @@ export const reactor = {
       legend: [{ color: theme.palette[0], text: "fuel rod = a note edited lately, colour = topic" }, { color: mix(theme.fg, theme.bg, 0.25), text: "control rod = a stale note others link to" }, { color: HOT, text: "hot leg" }, { color: COLD, text: "cold leg, back to the vessel" }], insights: out,
     });
     frame.controls({ lines: ["Pick a rod to open its note, a loop to see only its topic"], buttons: [] });
+    stage.sky({ top: "#04060c", haze: "#0e121c" });   // a dark hall around the model, so the glow has something to shine against
     draw();
     return {
       targets: () => [
@@ -113,6 +120,7 @@ export const reactor = {
       stat,
       today: () => (L.control[0] ? { text: `${name(L.control[0].id)} is stale and ${plural(L.control[0].links, "note")} link to it.`, label: "Open note", run: () => onOpen(L.control[0].id) } : null),
       api: { layout: () => L, filter, only: () => only },
+      tick(t) { if (fx) fx.tick(t); },
       dispose() { if (model) scrap(stage.scene, model); },
     };
   },

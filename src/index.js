@@ -1,11 +1,12 @@
 // What a host imports. README.md has the table.
-//   mountViews(el, { view, data, inputs, onOpen, onAction, theme }) -> { view, resize, update, mark, turn, keyAt, noteAt, pageAt, stat, today, snapshot, api, dispose }
+//   mountViews(el, { view, data, inputs, onOpen, onAction, theme, motion }) -> { view, resize, update, mark, turn, keyAt, noteAt, pageAt, stat, today, snapshot, api, dispose }
 //   view      one of VIEWS' ids (default "bodies")
 //   data      the graph data (contract.js)
 //   inputs    what that view needs beyond the data, and the host's selection (contract.js, checkInputs)
 //   onOpen    (noteId) => void: the host's one detail panel, so every body opens the same detail
 //   onAction  (name) => void: a view asking the host for something it doesn't own (VIEWS lists each view's actions)
 //   theme     { bg, fg, muted, accent, palette } from the host
+//   motion    true to animate (lights on the models, a slow turn while the pointer is away); off by default, and always off when the person prefers reduced motion
 import { check, checkInputs, theme as withTheme } from "./contract.js";
 import { runScene } from "./run.js";
 import { bodies } from "./scenes/bodies.js";
@@ -27,7 +28,7 @@ import { reactor } from "./scenes/reactor.js";
 const SCENES = { bodies, cas9, genome, cones, loadpaths, modes, slime, cyberpunk, radar, clock, foodweb, city, atom, station, reactor };
 export const VIEWS = Object.values(SCENES).map(s => ({ id: s.id, name: s.name, hint: s.hint, actions: s.actions || [], under: (s.home.minPitch || 0) < 0 }));
 
-export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction, theme } = {}) {
+export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction, theme, motion = false } = {}) {
   const def = SCENES[view];
   if (!def) throw new Error(`vault-graph-views: no view "${view}" (there is ${Object.keys(SCENES).join(", ")})`);
   const problems = check(data);
@@ -35,7 +36,7 @@ export function mountViews(el, { view = "bodies", data, inputs, onOpen, onAction
   if (problems.length) throw new Error("vault-graph-views: " + problems.join("; "));
   if (typeof onOpen !== "function") throw new Error("vault-graph-views: onOpen is required");
   if ((def.actions || []).length && typeof onAction !== "function") throw new Error(`vault-graph-views: onAction is required for the ${def.name} view (it asks the host for: ${def.actions.join(", ")})`);
-  return runScene(el, def, { data, inputs: inputs || {}, onOpen, onAction, theme: withTheme(theme) });
+  return runScene(el, def, { data, inputs: inputs || {}, onOpen, onAction, motion, theme: withTheme(theme) });
 }
 export { check, checkInputs };
 export { bench } from "./bench.js";

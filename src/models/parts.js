@@ -1,5 +1,5 @@
 // Parts the built models share (the Station, the Reactor, the Atom): a rod laid between two points, and one mesh of many copies.
-import { InstancedMesh, Matrix4, Vector3, Quaternion, Color } from "three";
+import { InstancedMesh, Matrix4, Vector3, Quaternion, Color, Points, BufferGeometry, Float32BufferAttribute, PointsMaterial, AdditiveBlending } from "three";
 
 const UP = new Vector3(0, 1, 0), a = new Vector3(), d = new Vector3(), mid = new Vector3(), s = new Vector3(), q = new Quaternion(), col = new Color();
 // m becomes the matrix that lays a unit cylinder (height 1 along y, radius 1) from p to t ([x, y, z] each) at radius r
@@ -15,6 +15,16 @@ export function copies(geometry, material, items, each) {
   mesh.count = items.length; mesh.frustumCulled = false;
   items.forEach((it, i) => { m.identity(); const c = each(it, i, m); mesh.setMatrixAt(i, m); if (c != null) mesh.setColorAt(i, col.set(c)); });
   return mesh;
+}
+// n points of light that move: at(i, t) gives point i's [x, y, z] at time t (seconds); tick(t) moves them. They glow (the stage's bloom
+// takes them), are never clicked and are not measured when the view is framed (userData.backdrop).
+export function sparks(n, at, { size = 3.4, color = "#ffffff", opacity = 0.95 } = {}) {
+  const geo = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(new Float32Array(Math.max(1, n) * 3), 3));
+  const object = new Points(geo, new PointsMaterial({ color, size, sizeAttenuation: false, transparent: true, opacity, blending: AdditiveBlending, depthWrite: false }));
+  object.frustumCulled = false; object.userData.backdrop = true;
+  const tick = t => { const p = geo.getAttribute("position"); for (let i = 0; i < n; i++) { const v = at(i, t); p.setXYZ(i, v[0], v[1], v[2]); } p.needsUpdate = true; };
+  tick(0);
+  return { object, tick };
 }
 // take a built model off the scene and free everything it holds, before the next one is built
 export function scrap(scene, model) {
