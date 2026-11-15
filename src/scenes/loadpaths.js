@@ -6,6 +6,7 @@
 // The maths is truss.js; this only draws it.
 import { loadInsights } from "../insights.js";
 import { InstancedMesh, SphereGeometry, CylinderGeometry, MeshStandardMaterial, Matrix4, Quaternion, Vector3, Color } from "three";
+import { sparks } from "../models/parts.js";
 import { importanceOf } from "../notes.js";
 import { plural, clip } from "../text.js";
 import { solveTruss, vaultTruss, readTruss } from "../truss.js";
@@ -16,7 +17,7 @@ export const TENSION = "#60a5fa", COMPRESSION = "#f87171", GROUND = "#f59e0b";
 
 export const loadpaths = {
   id: "loadpaths", name: "Load paths", hint: "Which links carry the vault, and which note sags first",
-  home: { yaw: 0.6, pitch: 0.65, dist: 46, min: 12, max: 110 }, stage: { fog: [38, 90] },
+  home: { yaw: 0.6, pitch: 0.65, dist: 46, min: 12, max: 110 }, stage: { light: "camera", fog: [60, 150], ambient: 0.6, glow: { strength: 0.6, radius: 0.5, threshold: 0.8 } },
   actions: ["graph"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const T = vaultTruss(data.nodes, data.links);
@@ -31,6 +32,15 @@ export const loadpaths = {
     const size = i => 0.3 + 0.55 * Math.sqrt(Math.max(0, importance(byId.get(T.ids[i])))), maxCarry = Math.max(...R.carry, 1e-9);
     const pal = theme.palette, m = new Matrix4(), q = new Quaternion(), col = new Color(), up = new Vector3(0, 1, 0), add = o => { stage.scene.add(o); return o; };
     const grounded = new Set(T.fixed);
+    stage.sky({ top: "#03050b", haze: "#0a0f1c" });
+    // load made visible: points of light travel along the bars, more of them where a bar carries more. They run toward the joint a
+    // pulled bar pulls on, and away from the one a pushed bar pushes against, so a heavy path reads as a river of light.
+    const rivers = [false, true].map(push => {
+      const lanes = [];
+      T.bars.forEach(([i, j], b) => { if ((S.force[b] < 0) !== push) return; const k = Math.min(6, Math.round(1 + 5 * R.carry[b] / maxCarry)); for (let u = 0; u < k; u++) lanes.push({ i, j, phase: ((b * 0.618 + u / k) % 1), dir: push ? -1 : 1 }); });
+      const at = (idx, t) => { const l = lanes[idx], f = ((l.phase + l.dir * t * 0.12) % 1 + 1) % 1, a = T.pos[l.i], c = T.pos[l.j]; return [a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f, a[2] + (c[2] - a[2]) * f]; };
+      const s = sparks(lanes.length, at, { color: push ? "#ffb4a8" : "#a8d0ff", size: 3.4, opacity: 0.9 }); add(s.object); return s;
+    });
 
     const joints = add(new InstancedMesh(new SphereGeometry(1, 16, 12), new MeshStandardMaterial({ roughness: 0.45 }), n));
     const rods = add(new InstancedMesh(new CylinderGeometry(1, 1, 1, 8, 1), new MeshStandardMaterial({ roughness: 0.6 }), Math.max(T.bars.length, 1)));
@@ -82,6 +92,7 @@ export const loadpaths = {
     explain(); paint();
     return {
       targets: () => targets,
+      tick(t) { for (const r of rivers) r.tick(t); },
       click(k) { if (k.kind === "note") open(at.get(k.id)); else if (k.kind === "bar") { bar = +k.id; selected = null; paint(); invalidate(); } },
       hover(k) { const h = k && k.kind === "note" ? at.get(k.id) : null; if (h !== hovered) { hovered = h; paint(); } },
       update(next) { if ("selected" in next) { selected = next.selected && at.has(next.selected) ? at.get(next.selected) : null; bar = null; paint(); } },
