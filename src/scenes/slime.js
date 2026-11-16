@@ -16,7 +16,7 @@ export const FRAMES_PER_SECOND = 8, CARRY = 0.1;
 
 export const slime = {
   id: "slime", name: "Slime mould", hint: "Which written links carry the vault, and which fade away",
-  home: { yaw: 0.6, pitch: 0.75, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100], ambient: 0.55, glow: { strength: 0.6, radius: 0.5, threshold: 0.85 } },
+  home: { yaw: 0.6, pitch: 0.75, dist: 46, min: 14, max: 110 }, stage: { fog: [80, 200], ambient: 0.55, glow: { strength: 0.6, radius: 0.5, threshold: 0.85 } },
   actions: ["graph", "add-link", "decline-link"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const S = vaultSlime(data.nodes, data.links, { max: 80 }), n = S.ids.length, T = S.frames.length - 1;
@@ -56,7 +56,7 @@ export const slime = {
       if (!on) return lift(a);
       const u = (now * 0.35 + Math.floor(k / S.bars.length) / PER + e * 0.173) % 1, A = lift(a), B = lift(b);
       return [0, 1, 2].map(x => A[x] + (B[x] - A[x]) * u);
-    }, { size: 5, color: "#fde68a", opacity: 0.95 });
+    }, { size: 8, color: "#fde68a", opacity: 0.95 });
     const lights = [halos, pulses]; for (const f of lights) add(f.object);
     stage.sky({ top: "#04060c", haze: "#0e121c" });
     const stat = () => {
