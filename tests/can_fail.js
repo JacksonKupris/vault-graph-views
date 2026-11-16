@@ -13,6 +13,7 @@ const BREAKS = [
   { what: "a click on a note of the Notes view doesn't reach the host", file: "src/scenes/bodies.js", from: "click: k => onOpen(k.id)", to: "click: k => {}", test: "test_page.js" },
   { what: "a click on a match doesn't move Cas9 to it", file: "src/scenes/cas9.js", from: `if (L.hits.get(k.id) === "hit") { siteId = k.id; relayout(); } else words(); onOpen(k.id);`, to: "words(); onOpen(k.id);", test: "test_cas9.js" },
   { what: "pressing a note's name on the fold opens it without selecting it", file: "src/scenes/genome.js", from: "function open(id) { selected = id; paint();", to: "function open(id) { paint();", test: "test_genome.js" },
+  { what: "the genome fold's lights stop moving", file: "src/scenes/genome.js", from: "tick(t) { for (const f of lights) f.tick(t); },", to: "tick() {},", test: "test_motion.js" },
   { what: "the fog doesn't stand back with the camera on a phone", file: "src/stage.js", from: "scene.fog.far = fog[1] * back;", to: "scene.fog.far = fog[1];", test: "test_phone.js" },
   { what: "a fold of other journals is let through", file: "src/contract.js", from: "if (f.n !== s.days.length || f.X.length !== f.n)", to: "if (false)", test: "test_contract.js" },
   { what: "a match on a person's note counts as a site", file: "src/models/cas9.js", from: "!special(n)", to: "true", test: "test_models.js" },
