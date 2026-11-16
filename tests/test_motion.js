@@ -9,7 +9,7 @@ const { ev } = page;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 try {
   await ev(`window.__rig = (view, motion) => { const el = document.createElement("div"); el.style.cssText = "position:fixed;left:0;top:0;width:500px;height:400px"; document.body.appendChild(el);
-    window.__m = VaultGraphViews.mountViews(el, { view, data: window.__DATA, motion, onOpen() {}, onAction() {} }); window.__el = el; return window.__m.view; }`);
+    window.__m = VaultGraphViews.mountViews(el, { view, data: window.__DATA, inputs: { fold: window.__FOLD }, motion, onOpen() {}, onAction() {} }); window.__el = el; return window.__m.view; }`);
   const still = async (view, motion, hover) => {
     await ev(`window.__rig(${JSON.stringify(view)}, ${motion})`);
     if (hover) await ev(`window.__el.querySelector("canvas").dispatchEvent(new PointerEvent("pointerenter"))`);
@@ -26,5 +26,8 @@ try {
   }
   const rx = await still("reactor", true, false);
   ok(!rx.yaw && rx.picture, "the reactor moves its lights but doesn't turn (its cut-away faces the viewer)");
+  const gn = await still("genome", true, false), gnOff = await still("genome", false, false);
+  ok(gn.picture, "the genome fold's light walks the strand and runs along the loops");
+  ok(!gnOff.picture, "the genome fold without motion stays put");
 } finally { await page.close(); }
 done();
