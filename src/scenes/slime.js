@@ -10,12 +10,13 @@ import { slimeInsights } from "../insights.js";
 import { plural, clip } from "../text.js";
 import { vaultSlime } from "../physarum.js";
 import { simulate } from "../simulate.js";
+import { sparks } from "../models/parts.js";
 
 export const FRAMES_PER_SECOND = 8, CARRY = 0.1;
 
 export const slime = {
   id: "slime", name: "Slime mould", hint: "Which written links carry the vault, and which fade away",
-  home: { yaw: 0.6, pitch: 0.75, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100] },
+  home: { yaw: 0.6, pitch: 0.75, dist: 46, min: 14, max: 110 }, stage: { fog: [40, 100], ambient: 0.55, glow: { strength: 0.6, radius: 0.5, threshold: 0.85 } },
   actions: ["graph", "add-link", "decline-link"],
   build({ stage, frame, data, inputs, onOpen, onAction, theme, invalidate }) {
     const S = vaultSlime(data.nodes, data.links, { max: 80 }), n = S.ids.length, T = S.frames.length - 1;
@@ -46,6 +47,18 @@ export const slime = {
     const carrying = w => w.filter(x => x / peak >= CARRY).length;
     const size = i => (hub.has(i) ? 0.75 : 0.4);
     let current = widths(); heights();
+    // light: a halo on each hub, and pulses streaming along every link that carries flow, from the note with less flow through it to the one with more
+    // (the way the real mould streams its cytoplasm toward the food); a link that has faded carries none, its pulses rest inside a note
+    const PER = 2, haloAt = [...hub];
+    const halos = sparks(Math.max(1, haloAt.length), i => (haloAt[i] === undefined ? [0, -99, 0] : lift(haloAt[i])), { size: 14, color: theme.accent || "#38bdf8", opacity: 0.6 });
+    const pulses = sparks(S.bars.length * PER, (k, now) => {
+      const e = k % S.bars.length, [i, j] = S.bars[e], on = current[e] / peak >= CARRY, [a, b] = high[i] <= high[j] ? [i, j] : [j, i];
+      if (!on) return lift(a);
+      const u = (now * 0.35 + Math.floor(k / S.bars.length) / PER + e * 0.173) % 1, A = lift(a), B = lift(b);
+      return [0, 1, 2].map(x => A[x] + (B[x] - A[x]) * u);
+    }, { size: 5, color: "#fde68a", opacity: 0.95 });
+    const lights = [halos, pulses]; for (const f of lights) add(f.object);
+    stage.sky({ top: "#04060c", haze: "#0e121c" });
     const stat = () => {
       const f = hovered != null ? hovered : selected;
       if (f != null) { const own = S.bars.map((b, e) => (b[0] === f || b[1] === f ? e : -1)).filter(e => e >= 0), keep = own.filter(e => current[e] / peak >= CARRY).length; return `${name(f)} · ${hub.has(f) ? "hub · " : ""}${keep} of ${plural(own.length, "link")} carry on`; }
@@ -119,6 +132,7 @@ export const slime = {
       frame() {
         if (playing && t < T) { const now = performance.now(); if (last != null) t = Math.min(T, t + ((now - last) / 1000) * FRAMES_PER_SECOND); last = now; if (t >= T) { playing = false; refresh(); } else { current = widths(); shape(); frame.stat(stat()); } invalidate(); } else last = null;
       },
+      tick(now) { for (const f of lights) f.tick(now); },
       stat,
       today: () => ({ text: `${carrying(S.frames[T])} of ${plural(S.bars.length, "link")} carry the vault between its ${S.hubs.length} ${FOOD}`, label: "Show it", run: () => { selected = null; t = T; playing = false; refresh(); } }),
       api: {
@@ -126,7 +140,7 @@ export const slime = {
         setStep(v) { t = Math.max(0, Math.min(T, v)); playing = false; refresh(); invalidate(); }, hold() { playing = false; refresh(); }, selected: () => (selected == null ? null : S.ids[selected]),
         carrying: () => carrying(current), links: () => S.bars.length,
       },
-      dispose() { for (const o of [tubes, beads]) { o.material.dispose(); o.geometry.dispose(); } },
+      dispose() { for (const f of lights) { stage.scene.remove(f.object); f.object.geometry.dispose(); f.object.material.dispose(); } for (const o of [tubes, beads]) { o.material.dispose(); o.geometry.dispose(); } },
     };
   },
 };

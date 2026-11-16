@@ -29,5 +29,10 @@ try {
   const gn = await still("genome", true, false), gnOff = await still("genome", false, false);
   ok(gn.picture, "the genome fold's light walks the strand and runs along the loops");
   ok(!gnOff.picture, "the genome fold without motion stays put");
+  // slime: with the growth finished and held, the picture still changes, because pulses stream along the links that carry flow
+  await ev('window.__rig("slime", true)'); await ev("window.__m.api.setStep(window.__m.api.steps())"); await sleep(400);
+  const sa = await ev("window.__m.snapshot().slice(-300)"); await sleep(900); const sb = await ev("window.__m.snapshot().slice(-300)");
+  ok(sa !== sb, "the slime mould's finished backbone still moves: light streams along the carrying links");
+  await ev("window.__m.dispose(); window.__el.remove()");
 } finally { await page.close(); }
 done();
