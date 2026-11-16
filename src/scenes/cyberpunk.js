@@ -10,6 +10,7 @@ import { Mesh, InstancedMesh, BoxGeometry, CircleGeometry, SphereGeometry, MeshB
 import { importanceOf, activityOf, staleOf, special, hash } from "../notes.js";
 import { districtsOf, gridDims, scatter, fromMiddle } from "../districts.js";
 import { plural, clip } from "../text.js";
+import { sparks } from "../models/parts.js";
 
 export const PITCH = 2.4, WINDOWS = ["#22d3ee", "#f472b6", "#facc15", "#a5f3fc"], BEACON = "#fb7185", STALL = "#facc15";
 // how a note's tower is lit: 0 dark (stale), 1 dim, 2 busy
@@ -70,7 +71,7 @@ const mix = (a, b, f) => new Color(a).lerp(new Color(b), f);
 // The Cyberpunk look. A look dresses the one city: its words, colours, where the cars run, and whether a map is a spire or a town hall.
 const NEON = {
   id: "cyberpunk", name: "Cyberpunk", hint: "A neon city: topics are districts, notes are towers, stale ones go dark",
-  stage: { fog: [55, 170], ambient: 0.4 }, tower: "tower", hall: false, cranes: false,
+  stage: { fog: [55, 170], ambient: 0.4, glow: { strength: 0.55, radius: 0.55, threshold: 0.62 } }, tower: "tower", hall: false, cranes: false,
   sheet: { wall: "#2a2a36", pane: "#3a3a4a", lit: WINDOWS }, beacon: BEACON, beaconName: "pink", stall: STALL, arc: "#22d3ee",
   wall: (c, level) => mix(c, "#ffffff", level === 0 ? 0.55 : 0.3).multiplyScalar(level === 0 ? 0.5 : 1),
   // cars fly an air lane over the district
@@ -142,7 +143,17 @@ export const cityScene = look => ({
     roofs.frustumCulled = false;
     const tasks = T.filter(t => t.n.tasks > 0), beacons = add(new InstancedMesh(new SphereGeometry(1, 10, 8), new MeshBasicMaterial({ color: look.beacon }), Math.max(tasks.length, 1)));
     beacons.count = tasks.length; beacons.frustumCulled = false;
-    tasks.forEach((t, i) => beacons.setMatrixAt(i, m4.makeScale(0.28, 0.28, 0.28).setPosition(t.x, t.h + 0.35, t.z)));
+    // a tower taller than 4 steps in at the top: a narrower crown on the roof, and a mast on every third one
+    const crownOf = t => (t.kind === "tower" && t.h > 4 ? Math.min(1.4, t.h * 0.12) : 0);
+    tasks.forEach((t, i) => beacons.setMatrixAt(i, m4.makeScale(0.28, 0.28, 0.28).setPosition(t.x, t.h + crownOf(t) + 0.35, t.z)));
+    const crowned = T.filter(t => crownOf(t) > 0);
+    const crowns = add(new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial(), Math.max(crowned.length, 1)));
+    crowns.count = crowned.length; crowns.frustumCulled = false;
+    crowned.forEach((t, i) => { const c = crownOf(t); crowns.setMatrixAt(i, m4.makeScale(t.w * 0.66, c, t.w * 0.66).setPosition(t.x, t.h + 0.12 + c / 2, t.z)); crowns.setColorAt(i, look.wall(neon(t), t.level).multiplyScalar(0.7)); });
+    const masts = crowned.filter(t => hash(t.n.id) % 3 === 0);
+    const mastMesh = add(new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial(), Math.max(masts.length, 1)));
+    mastMesh.count = masts.length; mastMesh.frustumCulled = false;
+    masts.forEach((t, i) => { const len = 1.2 + (hash(t.n.id) % 5) * 0.35; mastMesh.setMatrixAt(i, m4.makeScale(0.05, len, 0.05).setPosition(t.x, t.h + 0.12 + crownOf(t) + len / 2, t.z)); mastMesh.setColorAt(i, mix(neon(t), "#ffffff", 0.4)); });
     // the cars of each district's air lane
     const cars = L.districts.flatMap(d => Array.from({ length: d.cars }, (_, i) => { const [u, v] = scatter(`car:${d.cluster}:${i}`); return { d, u, v: (0.02 + v * 0.05) * (i % 2 ? 1 : -1), ...look.lane(u, v, i, L.cell) }; }));
     const carMesh = add(new InstancedMesh(new BoxGeometry(0.7, 0.12, 0.14), new MeshBasicMaterial(), Math.max(cars.length, 1)));
@@ -212,8 +223,15 @@ export const cityScene = look => ({
     frame.controls({ lines: [`Pick a ${look.tower} to see what it links to`] });
     paint();
     const started = performance.now();
+    const carAt = (c, t) => [c.d.x + ((((c.u + c.v * t) % 1) + 1) % 1 - 0.5) * (L.cell - 2), c.y, c.d.z + c.z];
+    // street lamps along each district's edge, and a glow riding each car
+    const lamps = [], LAMP = 4.8;
+    for (const p of L.pads) for (let k = 0; k <= Math.floor(p.size / LAMP); k++) { const o = -p.size / 2 + 0.3 + k * LAMP; lamps.push([p.x + o, 0.5, p.z - p.size / 2 + 0.3], [p.x + o, 0.5, p.z + p.size / 2 - 0.3]); }
+    const lampGlow = sparks(lamps.length, i => lamps[i], { size: 3, color: look.id === "city" ? "#ffe2a0" : "#ff9be0", opacity: 0.8 }); add(lampGlow.object);
+    const carGlow = sparks(cars.length, (i, t) => carAt(cars[i], t), { size: 3.5, color: look.id === "city" ? "#fff2b0" : "#e0f2fe", opacity: 0.9 }); add(carGlow.object);
     const drive = t => {
-      cars.forEach((c, i) => carMesh.setMatrixAt(i, m4.makeTranslation(c.d.x + ((((c.u + c.v * t) % 1) + 1) % 1 - 0.5) * (L.cell - 2), c.y, c.d.z + c.z)));
+      carGlow.tick(t);
+      cars.forEach((c, i) => carMesh.setMatrixAt(i, m4.makeTranslation(...carAt(c, t))));
       carMesh.instanceMatrix.needsUpdate = true; if (carMesh.instanceColor) carMesh.instanceColor.needsUpdate = true;
     };
     drive(0);
@@ -228,7 +246,7 @@ export const cityScene = look => ({
       stat,
       today: () => (worst && worst[0] ? { text: `Darkest district: ${L.districts[worst[1]].name} · ${plural(worst[0], "stale note")}`, label: "Go there", run: () => goTo(worst[1]) } : null),
       api: { back: () => stage.camera.position.distanceTo(stage.centre), sky: () => (glow ? { hour, glow, stars: night && darkTheme } : null), layout: () => L, selected: () => selected, district: () => (only == null ? null : L.districts[only].cluster), hold() { held = true; beacons.visible = true; invalidate(); }, towers: () => T.filter(t => t.kind === "tower").length, stalls: () => stalls.length, dark: () => dark.length, halls: () => halls.length, cranes: () => cranes.length, tallest: () => (tallest ? tallest.n.id : null) },
-      dispose() { held = true; clearTimeout(timer); for (const o of [pads, street, ...(ground ? [ground] : []), roofs, beacons, carMesh, arcs, extras, ...parts.map(p => p.mesh)]) { if (o.material.map) o.material.map.dispose(); } },
+      dispose() { held = true; clearTimeout(timer); for (const o of [pads, street, ...(ground ? [ground] : []), roofs, beacons, carMesh, arcs, extras, crowns, mastMesh, ...parts.map(p => p.mesh)]) { if (o.material.map) o.material.map.dispose(); } },
     };
   },
 });
