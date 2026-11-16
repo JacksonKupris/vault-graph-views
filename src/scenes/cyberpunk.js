@@ -107,6 +107,8 @@ export const cityScene = look => ({
     const hour = typeof inputs.hour === "number" ? inputs.hour : new Date().getHours(), night = hour < 5 || hour >= 21;
     const darkTheme = new Color(theme.bg).getHSL({}).l < 0.5, glow = look.sky ? look.sky(hour) : null;
     let ground = null;
+    // a look with a bloom but no sky still needs a dark backdrop, or tone mapping lifts the background to grey
+    if (!glow && look.stage.glow) stage.sky({ top: "#04060c", haze: "#0e121c" });
     if (glow) {
       stage.sky({ top: mix(theme.bg, glow, darkTheme ? 0 : 0.3), haze: mix(theme.bg, glow, darkTheme ? 0.035 : 0.1), stars: night && darkTheme ? 160 : 0 });
       ground = add(new Mesh(new CircleGeometry(Math.max(L.bounds.x[1] - L.bounds.x[0], L.cell * 3) * 4, 48).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: mix(look.ground, theme.bg, darkTheme ? 0.94 : 0.45) })));
