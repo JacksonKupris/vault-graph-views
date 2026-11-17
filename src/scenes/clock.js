@@ -39,7 +39,7 @@ export const peakOf = (r, key) => r[key].indexOf(Math.max(...r[key]));
 
 export const clock = {
   id: "clock", name: "Heat clock", hint: "When each topic comes up: weekday and month dials, hotter = more mentions",
-  home: { yaw: 0, pitch: 1.5, dist: 60, min: 20, max: 140, minPitch: 0.55, maxPitch: 1.5, pan: true }, stage: { fog: false, ambient: 1 },
+  home: { yaw: 0, pitch: 1.5, dist: 60, min: 20, max: 140, minPitch: 0.55, maxPitch: 1.5, pan: true }, stage: { fog: false, ambient: 1, glow: { strength: 0.5, radius: 0.45, threshold: 0.55 } },
   actions: ["graph"],
   build({ stage, frame, orbit, data, inputs, onOpen, onAction, theme, invalidate }) {
     const vertical = (stage.camera.aspect || 1) < 1, L = clockLayout(data, inputs.now || new Date(), vertical), add = o => { stage.scene.add(o); return o; };
@@ -52,6 +52,7 @@ export const clock = {
     const colorOf = c => theme.palette[Math.max(0, data.clusters.findIndex(k => k.id === c)) % theme.palette.length];
     const base = new Color("#1f2933"), idle = new Color("#1a2027"), tint = new Color(), col = new Color();
     const at = (d, a, r) => [d.centre[0] + Math.cos(a) * r, d.centre[1] + Math.sin(a) * r];
+    stage.sky({ top: "#02040a", haze: "#070b14" });   // a dark room, so the lit cells and the hand are the brightest things in it
 
     // one geometry for every cell: a prism per cell (top, outer and inner wall, two sides), coloured per vertex so a focus can dim the rest
     const pos = [], ranges = [], segs = d => (d.n === 7 ? 3 : 2);
@@ -74,6 +75,19 @@ export const clock = {
     geo.setAttribute("color", colours);
     add(new Mesh(geo, new MeshBasicMaterial({ vertexColors: true, side: DoubleSide }))).frustumCulled = false;
 
+    // the dial's furniture, as on a real clock face: a hairline at every ring's edge, a double rim, a hub, a tick at every slot and
+    // four minor ticks inside it (a weekday is quarters of a day; a month, weeks)
+    const faint = [], bright = [], arc = (d, r, out) => { for (let k = 0; k < 96; k++) { const [p, q] = at(d, (k / 96) * 2 * Math.PI, r), [u, v] = at(d, ((k + 1) / 96) * 2 * Math.PI, r); out.push(p, 0.02, q, u, 0.02, v); } };
+    L.dials.forEach(d => {
+      L.rings.forEach((_, ri) => arc(d, RING0 + ri * STEP - (STEP - THICK) / 2, faint));
+      arc(d, RING0 - 0.6, bright); arc(d, L.rOut + 0.7, bright); arc(d, L.rOut + 0.95, faint);
+      for (let s = 0; s < d.n; s++) for (let m = 0; m < 4; m++) {
+        const a = ang(s + m / 4, d.n), [p, q] = at(d, a, L.rOut + 0.7), [u, v] = at(d, a, L.rOut + (m ? 0.85 : 1.15)); (m ? faint : bright).push(p, 0.02, q, u, 0.02, v);
+      }
+    });
+    const furniture = (pts, color, opacity) => { const g = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(pts, 3)); return add(new LineSegments(g, new LineBasicMaterial({ color, transparent: true, opacity }))); };
+    furniture(faint, "#64748b", 0.3); furniture(bright, "#cbd5e1", 0.7);
+
     // the hands: right now, on each dial, and the slice it falls in
     const hand = [], slot = [];
     L.dials.forEach(d => {
@@ -82,8 +96,8 @@ export const clock = {
       for (const e of [ang(s, d.n), ang(s + 1, d.n)]) { const [p, q] = at(d, e, r0), [u, v] = at(d, e, r1); slot.push(p, 0.3, q, u, 0.3, v); }
     });
     const line = (pts, opacity) => { const g = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(pts, 3)); return add(new LineSegments(g, new LineBasicMaterial({ color: NOW, transparent: true, opacity }))); };
-    line(hand, 1); line(slot, 0.55);
-    L.dials.forEach(d => { const a = ang(L.now.frac[d.key] * d.n, d.n), [x, z] = at(d, a, L.rOut + 0.4); add(new Mesh(new SphereGeometry(0.4, 12, 8), new MeshBasicMaterial({ color: NOW }))).position.set(x, 0.3, z); });
+    line(hand, 1); const slotLines = line(slot, 0.55);
+    const beads = L.dials.map(d => { const a = ang(L.now.frac[d.key] * d.n, d.n), [x, z] = at(d, a, L.rOut + 0.4), b = add(new Mesh(new SphereGeometry(0.4, 12, 8), new MeshBasicMaterial({ color: NOW }))); b.position.set(x, 0.3, z); return b; });
 
     const byRing = new Map(L.rings.map(r => [r.cluster, r])), notesOf = c => data.nodes.filter(n => n.cluster === c && !special(n)).sort((a, b) => (b.inlinks + b.outlinks) - (a.inlinks + a.outlinks) || (a.id < b.id ? -1 : 1));
     let focus = null, hovered = null;
@@ -138,12 +152,14 @@ export const clock = {
       click(k) { if (k.kind === "ring") pick(k.id); },
       hover(k) { const h = k && k.kind === "ring" ? k.cell : null; if (h !== hovered) { hovered = h; paint(); } },
       update() {},
+      // the hand's bead breathes, and the slice it stands in glows with it (one slow breath about every 4 seconds)
+      tick(t) { const b = 0.5 + 0.5 * Math.sin((t * 2 * Math.PI) / 4); beads.forEach(m => m.scale.setScalar(0.85 + 0.45 * b)); slotLines.material.opacity = 0.3 + 0.5 * b; },
       stat,
       today() {
         const w = L.now.wd, best = L.rings.map(r => ({ r, k: r.wd[w] / r.tot })).sort((a, b) => b.k - a.k)[0], n = best && notesOf(best.r.cluster)[0];
         return best && best.k > 0 ? { text: `It is ${WD[w]}: ${clip(best.r.name, 30)} usually comes up most on this day (${Math.round(best.k * 100)}% of its mentions)`, label: n ? "Open note" : "Show ring", run: () => (n ? onOpen(n.id) : pick(best.r.cluster)) } : null;
       },
-      api: { layout: () => L, focus: () => focus, hovered: () => hovered, tilted: () => orbit.tilted, rings: () => L.rings.length, cells: () => L.cells.length, vertical: () => vertical, cell: (d, r, s) => cellOf.get(`${d}:${r}:${s}`), top: () => top && top.cluster },
+      api: { beadScale: () => beads[0].scale.x, layout: () => L, focus: () => focus, hovered: () => hovered, tilted: () => orbit.tilted, rings: () => L.rings.length, cells: () => L.cells.length, vertical: () => vertical, cell: (d, r, s) => cellOf.get(`${d}:${r}:${s}`), top: () => top && top.cluster },
       dispose() {},
     };
   },

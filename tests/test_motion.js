@@ -34,5 +34,9 @@ try {
   const sa = await ev("window.__m.snapshot().slice(-300)"); await sleep(900); const sb = await ev("window.__m.snapshot().slice(-300)");
   ok(sa !== sb, "the slime mould's finished backbone still moves: light streams along the carrying links");
   await ev("window.__m.dispose(); window.__el.remove()");
+  // heat clock: the hand's bead breathes with motion on, and stays at one size with it off
+  const breath = async motion => { await ev(`window.__rig("clock", ${motion})`); await sleep(300); const a = await ev("window.__m.api.beadScale()"); await sleep(1200); const b = await ev("window.__m.api.beadScale()"); await ev("window.__m.dispose(); window.__el.remove()"); return a !== b; };
+  ok(await breath(true), "the heat clock's hand breathes with motion on");
+  ok(!(await breath(false)), "the heat clock's hand holds still with motion off");
 } finally { await page.close(); }
 done();
