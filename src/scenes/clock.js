@@ -39,7 +39,7 @@ export const peakOf = (r, key) => r[key].indexOf(Math.max(...r[key]));
 
 export const clock = {
   id: "clock", name: "Heat clock", hint: "When each topic comes up: weekday and month dials, hotter = more mentions",
-  home: { yaw: 0, pitch: 1.5, dist: 60, min: 20, max: 140, minPitch: 0.55, maxPitch: 1.5, pan: true }, stage: { fog: false, ambient: 1, glow: { strength: 0.5, radius: 0.45, threshold: 0.55 } },
+  home: { yaw: 0, pitch: 1.5, dist: 60, min: 20, max: 140, minPitch: 0.55, maxPitch: 1.5, pan: true }, stage: { fog: false, ambient: 1, glow: { strength: 0.3, radius: 0.4, threshold: 0.8 } },
   actions: ["graph"],
   build({ stage, frame, orbit, data, inputs, onOpen, onAction, theme, invalidate }) {
     const vertical = (stage.camera.aspect || 1) < 1, L = clockLayout(data, inputs.now || new Date(), vertical), add = o => { stage.scene.add(o); return o; };
@@ -75,18 +75,13 @@ export const clock = {
     geo.setAttribute("color", colours);
     add(new Mesh(geo, new MeshBasicMaterial({ vertexColors: true, side: DoubleSide }))).frustumCulled = false;
 
-    // the dial's furniture, as on a real clock face: a hairline at every ring's edge, a double rim, a hub, a tick at every slot and
-    // four minor ticks inside it (a weekday is quarters of a day; a month, weeks)
-    const faint = [], bright = [], arc = (d, r, out) => { for (let k = 0; k < 96; k++) { const [p, q] = at(d, (k / 96) * 2 * Math.PI, r), [u, v] = at(d, ((k + 1) / 96) * 2 * Math.PI, r); out.push(p, 0.02, q, u, 0.02, v); } };
+    // the dial's furniture, kept to little so the cells stay clean: a hub circle, one rim and a tick at every slot's edge
+    const bright = [], arc = (d, r, out) => { for (let k = 0; k < 96; k++) { const [p, q] = at(d, (k / 96) * 2 * Math.PI, r), [u, v] = at(d, ((k + 1) / 96) * 2 * Math.PI, r); out.push(p, 0.02, q, u, 0.02, v); } };
     L.dials.forEach(d => {
-      L.rings.forEach((_, ri) => arc(d, RING0 + ri * STEP - (STEP - THICK) / 2, faint));
-      arc(d, RING0 - 0.6, bright); arc(d, L.rOut + 0.7, bright); arc(d, L.rOut + 0.95, faint);
-      for (let s = 0; s < d.n; s++) for (let m = 0; m < 4; m++) {
-        const a = ang(s + m / 4, d.n), [p, q] = at(d, a, L.rOut + 0.7), [u, v] = at(d, a, L.rOut + (m ? 0.85 : 1.15)); (m ? faint : bright).push(p, 0.02, q, u, 0.02, v);
-      }
+      arc(d, RING0 - 0.6, bright); arc(d, L.rOut + 0.7, bright);
+      for (let s = 0; s < d.n; s++) { const a = ang(s, d.n), [p, q] = at(d, a, L.rOut + 0.7), [u, v] = at(d, a, L.rOut + 1.1); bright.push(p, 0.02, q, u, 0.02, v); }
     });
-    const furniture = (pts, color, opacity) => { const g = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(pts, 3)); return add(new LineSegments(g, new LineBasicMaterial({ color, transparent: true, opacity }))); };
-    furniture(faint, "#64748b", 0.3); furniture(bright, "#cbd5e1", 0.7);
+    { const g = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(bright, 3)); add(new LineSegments(g, new LineBasicMaterial({ color: "#94a3b8", transparent: true, opacity: 0.55 }))); }
 
     // the hands: right now, on each dial, and the slice it falls in
     const hand = [], slot = [];
